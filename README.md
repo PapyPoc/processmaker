@@ -4,3 +4,22 @@
 
 
  ![Image](https://www.processmaker.com/wp-content/uploads/2024/07/processmaker-business-process-automation-platform.webp)
+
+## How to use
+
+Process Maker is installed by running the following command in your terminal.
+
+>[!IMPORTANT]
+>⚠️ It is strongly recommended to run this script on a new installation or on an installation made with this script.
+>
+>⚠️ You must be logged in as root. To do this, type ```su -``` into the console.
+>
+>⚠️ Make sure the script is no longer present in the ``/root`` directory.
+>
+>⚠️ 'Wget' must be installed on your system ```dnf install wget -y```.
+>
+>⚠️ Git must be installed on your system  ```dnf install -y git``` 
+
+```
+git clone https://github.com/Papy-Poc/glpi_install.git -b main && chmod -R +x glpi_install && ./glpi_install/glpi-install.sh
+```
