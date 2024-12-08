@@ -5,7 +5,7 @@
 # Version: 1.4.0
 #
 
-
+source ./processmaker/install.cfg
 function warn(){
     echo -e '\e[31m'"$1"'\e[0m';
 }
