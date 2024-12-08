@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# ProcessMaker install script
+# Author: PapyPoc
+# Version: 1.0.0
+# ProcessMaker BPM Core : https://github.com/ProcessMaker/processmaker/tree/release-2024-fall
+#
+
+source ./processmaker/conf
+source ./processmaker/function
+
+clear
+check_root
+check_distro
+update_distro
+install_packages
+network_info
+mariadb_configure
+sleep 5
+install_pm
+sleep 5
+setup_pm
+sleep 5
+maj_user_pm
+display_credentials
+write_credentials
+efface_script
+
+function update(){
+    maintenance "1"
+    backup_pm
+    install_pm
+    update_pm
+    maintenance "0"
+    efface_script
+}

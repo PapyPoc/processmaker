@@ -3,11 +3,9 @@
 # ProcessMaker function
 
 function warn(){
-    echo -e '\e[31m'"$1"'\e[0m';
-}
+    echo -e '\e[31m'"$1"'\e[0m';}
 function info(){
-    echo -e '\e[36m'"$1"'\e[0m';
-}
+    echo -e '\e[36m'"$1"'\e[0m';}
 function check_root(){
     # Vérification des privilèges root
     if [[ "$(id -u)" -ne 0 ]]; then
@@ -15,13 +13,11 @@ function check_root(){
             exit 0
     else
             info "Privilège Root: OK"
-    fi
-}
+    fi}
 function compatible() {
     local version="$1"
     local -n versions_array="$2"
-    [[ ${versions_array[*]} =~ ${version} ]]
-}
+    [[ ${versions_array[*]} =~ ${version} ]]}
 function check_distro(){
     # Vérifie si le fichier os-release existe
     if [ -f /etc/os-release ]; then
@@ -54,22 +50,18 @@ function check_distro(){
     else
         warn "Il s'agit d'une autre distribution que Debian ou Ubuntu qui n'est pas compatible."
         exit 1
-    fi
-}
+    fi}
 function check_install(){
     # Vérifie si le répertoire existe
     if [ -d "$1" ]; then
-        output=$(php ${REP_GLPI}bin/console -V 2>&1)
-        sleep 2
-        glpi_cli_version=$(sed -n 's/.*GLPI CLI \([^ ]*\).*/\1/p' <<< "$output")
         warn "Le site est déjà installé. Version ""$glpi_cli_version"
-        info "Nouvelle version trouver : GLPI version $NEW_VERSION"
+        info "Nouvelle version trouver : ProcessMaker version $NEW_VERSION"
         if [ "$glpi_cli_version" == "$NEW_VERSION" ]; then
-            info "Vous avez déjà la dernière version de GLPI. Mise à jour annuler"
+            info "Vous avez déjà la dernière version de ProcessMaker. Mise à jour annuler"
             sleep 5
             exit 0;
         else
-            info "Voulez-vous mettre à jour GLPI (O/N): "
+            info "Voulez-vous mettre à jour ProcessMaker (O/N): "
             read -r MaJ
             case "$MaJ" in
                 "O" | "o")
@@ -86,10 +78,9 @@ function check_install(){
             esac
         fi
     else
-        warn "Nouvelle installation de GLPI"
+        warn "Nouvelle installation de ProcessMaker"
         install
-    fi
-}
+    fi}
 function update_distro(){
     if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
         info "Recherche des mises à jour"
@@ -101,13 +92,11 @@ function update_distro(){
         dnf update -y > /dev/null 2>&1
         info "Application des mises à jour"
         dnf upgrade -y > /dev/null 2>&1
-    fi
-}
+    fi}
 function network_info(){
     INTERFACE=$(ip route | awk 'NR==1 {print $5}')
     IPADRESS=$(ip addr show "$INTERFACE" | grep inet | awk '{ print $2; }' | sed 's/\/.*$//' | head -n 1)
-    # HOST=$(hostname)
-}
+    # HOST=$(hostname)}
 function install_packages(){
     if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
         sleep 1
@@ -134,17 +123,14 @@ function install_packages(){
         sed -i 's/^\(;\?\)\(reboot =\).*/\2 when-needed/' /etc/dnf/automatic.conf
         sed -i 's/^\(;\?\)\(upgrade_type =\).*/\2 security/' /etc/dnf/automatic.conf
         mkdir /etc/systemd/system/dnf-automatic.timer.d
-        cat > /etc/systemd/system/dnf-automatic.timer.d/override.conf << EOF
-[Unit]
-Description=dnf-automatic timer
-ConditionPathExists=!/run/ostree-booted
-Wants=network-online.target
-
-[Timer]
-OnCalendar=*-*-* 6:00
-RandomizedDelaySec=60m
-Persistent=true
-EOF
+        echo "[Unit]" > /etc/systemd/system/dnf-automatic.timer.d/override.conf
+        echo "Description=dnf-automatic timer" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+        echo "ConditionPathExists=!/run/ostree-booted" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+        echo "Wants=network-online.target" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+        echo "[Timer]" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+        echo "OnCalendar=*-*-* 6:00" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+        echo "RandomizedDelaySec=60m" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+        echo "Persistent=true" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
         systemctl enable --now dnf-automatic.timer > /dev/null 2>&1
         info "Installation des extensions de php"
         dnf install -y php-{mysqlnd,mbstring,curl,gd,xml,intl,ldap,apcu,opcache,zip,bz2} > /dev/null 2>&1
@@ -156,8 +142,7 @@ EOF
         systemctl enable --now mariadb nginx php-fpm > /dev/null 2>&1
         firewall-cmd --permanent --zone=public --add-service=http > /dev/null 2>&1
         firewall-cmd --reload > /dev/null 2>&1
-    fi
-}
+    fi }
 function mariadb_configure(){
     info "Configuration de MariaDB"
     sleep 1
@@ -168,7 +153,7 @@ function mariadb_configure(){
     # Create a new database
     mysql -e "CREATE DATABASE glpi;" > /dev/null 2>&1
     # Create a new user
-    mysql -e "CREATE USER 'glpi_user'@'localhost' IDENTIFIED BY '$SQLGLPIPWD';" > /dev/null 2>&1
+    mysql -e "CREATE USER 'glpi_user'@'localhost' IDENTIFIED BY '$SQLPMPWD';" > /dev/null 2>&1
     # Grant privileges to the new user for the new database
     mysql -e "GRANT ALL PRIVILEGES ON glpi.* TO 'glpi_user'@'localhost';" > /dev/null 2>&1
     # Reload privileges
@@ -209,97 +194,29 @@ function mariadb_configure(){
     echo "table_open_cache_instances = 4" >> /etc/mysql/conf.d/my.cnf
     # Restart MariaDB
     systemctl restart mariadb
-    sleep 1
-}
+    sleep 1 }
 function install_ps(){
     info "Téléchargement et installation de la version ${NEW_VERSION} de ProcessMaker..."
     # Get download link for the latest release
     DOWNLOADLINK=$(curl -s  https://api.github.com/repos/ProcessMaker/processmaker/releases/latest | jq -r '.assets[0].browser_download_url')
     wget -O /tmp/ps-latest.tgz "$DOWNLOADLINK" > /dev/null 2>&1
-    tar xzf /tmp/ps-latest.tgz -C /opt/processmaker
-}
-function setup_glpi(){
-    info "Configuration de GLPI..."
-    mkdir -p /var/log/glpi
-    mkdir -p /etc/glpi/config
-    mkdir -p /var/lib/glpi/files
-    mv -f ${REP_GLPI}files /var/lib/glpi
-    cat > /etc/glpi/config/local_define.php << EOF
-<?php
-    define('GLPI_VAR_DIR', '/var/lib/glpi/files');
-    define('GLPI_LOG_DIR', '/var/log/glpi/config');
-EOF
-    sleep 1
-    cat > ${REP_GLPI}inc/downstream.php << EOF
-<?php
-    define('GLPI_CONFIG_DIR', '/etc/glpi/config');
-    if (file_exists(GLPI_CONFIG_DIR . '/local_define.php')) {
-        require_once GLPI_CONFIG_DIR . '/local_define.php';
-    }
-EOF
-    if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
-        # Add permissions
-        chown -R www-data:www-data  /etc/glpi
-        chmod -R 777 /etc/glpi
-        sleep 1
-        chown -R www-data:www-data  /var/log/glpi
-        chmod -R 777 /var/log/glpi
-        sleep 1
-        chown -R www-data:www-data /var/lib/glpi/files
-        chmod -R 777 /var/lib/glpi/files
-        sleep 1
-        chown -R www-data:www-data ${REP_GLPI}
-        chmod -R 777 ${REP_GLPI}
-        sleep 1
-        # Setup vhost
-         cat > /etc/apache2/sites-available/glpi.conf << EOF
-<VirtualHost *:80>
-    ServerName glpi.lan
-    DocumentRoot ${REP_GLPI}public
-    <Directory ${REP_GLPI}public>
-        Require all granted
-        RewriteEngine On
-        RewriteCond %{HTTP:Authorization} ^(.+)$
-        RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteRule ^(.*)$ index.php [QSA,L]
-    </Directory>
-    ErrorLog /var/log/glpi/error.log
-    CustomLog /var/log/glpi/access.log combined
-</VirtualHost>
-EOF
-        phpversion=$(php -v | grep -i '(cli)' | awk '{print $2}' | cut -c 1,2,3)
-        sed -i 's/^\(;\?\)\(session.cookie_httponly\).*/\2 =on/' /etc/php/"$phpversion"/apache2/php.ini
-        sleep 1
-        # Disable Apache Web Server Signature
-        echo "ServerSignature Off" >> /etc/apache2/apache2.conf
-        echo "ServerTokens Prod" >> /etc/apache2/apache2.conf
-        # Activation du module rewrite d'apache
-        a2enmod rewrite > /dev/null 2>&1
-        # Déactivation du site par défaut et activation site glpi
-        a2dissite 000-default.conf > /dev/null 2>&1
-        a2ensite glpi.conf > /dev/null 2>&1
-        # Restart d'apache
-        systemctl restart apache2 > /dev/null 2>&1
-        sudo -u www-data php ${REP_GLPI}bin/console db:install --db-host="localhost" --db-port=3306 --db-name=glpi --db-user=glpi_user --db-password="${SQLGLPIPWD}" --default-language="${LANG}" --force --no-telemetry --quiet --no-interaction
+    tar xzf /tmp/ps-latest.tgz -C /opt/processmaker }
+function setup_pm(){
+    info "Configuration de ProcessMaker..."
+    mkdir -p /var/log/processmaker
     elif [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
-        chown -R nginx:nginx /etc/glpi
-        chmod -R 777 /etc/glpi
+        chown -R nginx:nginx /var/log/processmaker
+        chmod -R 777 /var/log/processmaker
         sleep 1
-        chown -R nginx:nginx /var/log/glpi
-        chmod -R 777 /var/log/glpi
-        sleep 1
-        chown -R nginx:nginx /var/lib/glpi
-        chmod -R 777 /var/lib/glpi
         # Add permissions
-        chown -R nginx:nginx ${REP_GLPI}
-        chmod -R 777 ${REP_GLPI}
+        chown -R nginx:nginx ${REP_PM}
+        chmod -R 777 ${REP_PM}
         sleep 1
-        cat > /etc/nginx/conf.d/glpi.conf << EOF
+        cat > /etc/nginx/conf.d/pm.conf << EOF
 server {
     listen 80;
     server_name glpi.localhost;
-    root ${REP_GLPI}public;
+    root ${REP_PM}public;
     location / {
         try_files \$uri /index.php\$is_args\$args;
     }
@@ -313,7 +230,7 @@ server {
 }
 EOF
         cat > /etc/logrotate.d/glpi << EOF
-# Rotate GLPI logs daily, only if not empty
+# Rotate ProcessMaker logs daily, only if not empty
 # Save 14 days old logs under compressed mode
 /var/lib/glpi/files/_log/*.log {
     su nginx nginx
@@ -332,22 +249,21 @@ EOF
     setsebool -P httpd_can_network_connect on
     setsebool -P httpd_can_network_connect_db on
     setsebool -P httpd_can_sendmail on
-    semanage fcontext -a -t httpd_sys_rw_content_t "${REP_GLPI}(/.*)?" > /dev/null 2>&1
+    semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}(/.*)?" > /dev/null 2>&1
     semanage fcontext -a -t httpd_sys_rw_content_t "/var/lib/glpi(/.*)?" > /dev/null 2>&1
-    semanage fcontext -a -t httpd_sys_rw_content_t "/var/log/glpi(/.*)?" > /dev/null 2>&1
+    semanage fcontext -a -t httpd_sys_rw_content_t "/var/log/processmaker(/.*)?" > /dev/null 2>&1
     semanage fcontext -a -t httpd_sys_rw_content_t "/etc/glpi(/.*)?" > /dev/null 2>&1
-    semanage fcontext -a -t httpd_sys_rw_content_t "${REP_GLPI}marketplace" > /dev/null 2>&1
-    restorecon -R ${REP_GLPI} > /dev/null 2>&1
+    semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}marketplace" > /dev/null 2>&1
+    restorecon -R ${REP_PM} > /dev/null 2>&1
     restorecon -R /var/lib/glpi > /dev/null 2>&1
-    restorecon -R /var/log/glpi > /dev/null 2>&1
+    restorecon -R /var/log/processmaker > /dev/null 2>&1
     restorecon -R /etc/glpi > /dev/null 2>&1
-    restorecon -R ${REP_GLPI}marketplace > /dev/null 2>&1
+    restorecon -R ${REP_PM}marketplace > /dev/null 2>&1
     # Restart de Nginx et php-fpm
     systemctl restart nginx php-fpm
-    sudo -u nginx php ${REP_GLPI}bin/console db:install --db-host="localhost" --db-port=3306 --db-name=glpi --db-user=glpi_user --db-password="${SQLGLPIPWD}" --default-language="${LANG}" --force --no-telemetry --quiet --no-interaction 
-    fi
+   fi
     sleep 5
-    rm -rf ${REP_GLPI}install/install.php
+    rm -rf ${REP_PM}install/install.php
     sleep 5
     sed -i '$i \   public $date_default_timezone_set = ("'${TIMEZONE}'");' /etc/glpi/config/config_db.php
     # Change timezone and language
@@ -357,81 +273,68 @@ EOF
         # Change permissions
         chown -Rc www-data:www-data /etc/glpi
         chmod -R 755 /etc/glpi
-        chown -Rc www-data:www-data /var/log/glpi
-        chmod -R 755 /var/log/glpi
-        chown -Rc www-data:www-data ${REP_GLPI}
-        chmod -R 755 ${REP_GLPI}
+        chown -Rc www-data:www-data /var/log/processmaker
+        chmod -R 755 /var/log/processmaker
+        chown -Rc www-data:www-data ${REP_PM}
+        chmod -R 755 ${REP_PM}
         systemctl restart apache2
         # Setup Cron task
-        echo "*/2 * * * * www-data /usr/bin/php ${REP_GLPI}front/cron.php &>/dev/null" >> /etc/cron.d/glpi
+        echo "*/2 * * * * www-data /usr/bin/php ${REP_PM}front/cron.php &>/dev/null" >> /etc/cron.d/glpi
     elif [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
          # Change permissions
         chown -R nginx:nginx /etc/glpi
         chmod -R 755 /etc/glpi
-        chown -R nginx:nginx /var/log/glpi
-        chmod -R 755 /var/log/glpi
-        chown -R nginx:nginx ${REP_GLPI}
-        chmod -R 755 ${REP_GLPI}
+        chown -R nginx:nginx /var/log/processmaker
+        chmod -R 755 /var/log/processmaker
+        chown -R nginx:nginx ${REP_PM}
+        chmod -R 755 ${REP_PM}
         systemctl restart nginx php-fpm
-        echo "*/2 * * * * nginx /usr/bin/php ${REP_GLPI}front/cron.php &>/dev/null" >> /etc/cron.d/glpi
-    fi
-}
-function maj_user_glpi(){
-    info "Changement des mots de passe de GLPI..."
+        echo "*/2 * * * * nginx /usr/bin/php ${REP_PM}front/cron.php &>/dev/null" >> /etc/cron.d/glpi
+    fi }
+function maj_user_pm(){
+    info "Changement des mots de passe de ProcessMaker..."
     # Changer le mot de passe de l'admin glpi 
-    mysql -u glpi_user -p"${SQLGLPIPWD}" -e "USE glpi; UPDATE glpi_users SET password = MD5('${ADMINGLPIPWD}') WHERE name = 'glpi';"
-    # Changer le mot de passe de l'utilisateur post-only
-    mysql -u glpi_user -p"${SQLGLPIPWD}" -e "USE glpi; UPDATE glpi_users SET password = MD5('${POSTGLPIPWD}') WHERE name = 'post-only';"
-    # Changer le mot de passe de l'utilisateur tech
-    mysql -u glpi_user -p"${SQLGLPIPWD}" -e "USE glpi; UPDATE glpi_users SET password = MD5('${TECHGLPIPWD}') WHERE name = 'tech';"
-    # Changer le mot de passe de l'utilisateur normal
-    mysql -u glpi_user -p"${SQLGLPIPWD}" -e "USE glpi; UPDATE glpi_users SET password = MD5('${NORMGLPIPWD}') WHERE name = 'normal';"
-}
+    mysql -u pm_user -p"${SQLPMPWD}" -e "USE pm; UPDATE pm_users SET password = MD5('${ADMINPMPWD}') WHERE name = 'glpi';"
 function display_credentials(){
-    info "<==========================> Détail de l'installation de GLPI <=================================>"
-    info "GLPI Version: ${NEW_VERSION}"
-    info "Répertoire d'installation de GLPI: ${REP_GLPI}"
+    info "<==========================> Détail de l'installation de ProcessMaker <=================================>"
+    info "ProcessMaker Version: ${NEW_VERSION}"
+    info "Répertoire d'installation de ProcessMaker: ${REP_PM}"
     warn "Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables."
     echo ""
     info "Les comptes utilisateurs par défaut sont :"
     info "UTILISATEUR  -  MOT DE PASSE       -  ACCES"
-    info "glpi         -  ${ADMINGLPIPWD}       -  compte admin"
-    info "post-only    -  ${POSTGLPIPWD}       -  compte post-only"
-    info "tech         -  ${TECHGLPIPWD}       -  compte tech"
-    info "normal       -  ${NORMGLPIPWD}       -  compte normal"
+    info "glpi         -  ${ADMINPMPWD}       -  compte admin"
     echo ""
-    info "Vous pouvez accéder à la page web de GLPI à partir d'une adresse IP ou d'un nom d'hôte :"
+    info "Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :"
     info "http://${IPADRESS}" 
     echo ""
     info "==> Database:"
     info "Mot de passe root: ${SLQROOTPWD}"
-    info "Mot de passe glpi_user: ${SQLGLPIPWD}"
-    info "Nom de la base de données GLPI: glpi"
+    info "Nom de la base de données ProcessMaker: glpi"
     info "<===============================================================================================>"
     echo ""
     info "Si vous rencontrez un problème avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues"
 }
 function write_credentials(){
     cat <<EOF > /root/sauve_mdp.txt
-<==========================> Détail de l'installation de GLPI <=================================>
-GLPI Version: ${NEW_VERSION}
-Répertoire d'installation de GLPI: ${REP_GLPI}
+<==========================> Détail de l'installation de ProcessMaker <=================================>
+ProcessMaker Version: ${NEW_VERSION}
+Répertoire d'installation de ProcessMaker: ${REP_PM}
 Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables.
 
 Les comptes utilisateurs par défaut sont :
 UTILISATEUR       -  MOT DE PASSE       -  ACCES
-info "glpi        -  ${ADMINGLPIPWD}       -  compte admin"
-info "post-only   -  ${POSTGLPIPWD}       -  compte post-only"
-info "tech        -  ${TECHGLPIPWD}       -  compte tech"
-info "normal      -  ${NORMGLPIPWD}       -  compte normal"
+info "glpi        -  ${ADMINPMPWD}       -  compte admin"
+info "post-only   -  ${POSTPMPWD}       -  compte post-only"
+info "tech        -  ${TECHPMPWD}       -  compte tech"
+info "normal      -  ${NORMPMPWD}       -  compte normal"
 
-Vous pouvez accéder à la page web de GLPI à partir d'une adresse IP ou d'un nom d'hôte :
+Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :
 http://${IPADRESS}
 
 ==> Database:
 Mot de passe root: ${SLQROOTPWD}
-Mot de passe glpi_user: ${SQLGLPIPWD}
-Nom de la base de données GLPI: glpi
+Nom de la base de données ProcessMaker: glpi
 <===============================================================================================>
 
 Si vous rencontrez un probléme avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues
@@ -454,20 +357,20 @@ function maintenance(){
     if [ "$1" == "1" ]; then
         warn "Mode maintenance activer"
         if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
-            sudo www-data php ${REP_GLPI}bin/console glpi:maintenance:enable  > /dev/null 2>&1
+            sudo www-data php ${REP_PM}bin/console glpi:maintenance:enable  > /dev/null 2>&1
         elif [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
-            sudo nginx php ${REP_GLPI}bin/console glpi:maintenance:enable  > /dev/null 2>&1
+            sudo nginx php ${REP_PM}bin/console glpi:maintenance:enable  > /dev/null 2>&1
         fi
     elif [ "$1" == "0" ]; then
         info "Mode maintenance désactiver"
         if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
-            sudo www-data php ${REP_GLPI}bin/console glpi:maintenance:disable  > /dev/null 2>&1
+            sudo www-data php ${REP_PM}bin/console glpi:maintenance:disable  > /dev/null 2>&1
         elif [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
-            sudo nginx php ${REP_GLPI}bin/console glpi:maintenance:disable  > /dev/null 2>&1
+            sudo nginx php ${REP_PM}bin/console glpi:maintenance:disable  > /dev/null 2>&1
         fi
     fi
 }
-function backup_glpi(){
+function backup_pm(){
         # Vérifie si le répertoire existe
         if [ ! -d "$REP_BACKUP" ]; then
             info "Création du  répertoire de sauvegarde avant mise à jour"
@@ -480,36 +383,29 @@ function backup_glpi(){
         info "La base de donnée a été sauvergardé avec succè."
         # Sauvegarde des fichiers
         info "Sauvegarde des fichiers du sites"
-        cp -Rf ${REP_GLPI} ${REP_BACKUP}backup_glpi
-        info "Les fichiers du site GLPI ont été sauvegardés avec succès."
+        cp -Rf ${REP_PM} ${REP_BACKUP}backup_pm
+        info "Les fichiers du site ProcessMaker ont été sauvegardés avec succès."
         info "Suppression des fichiers du site"
-        rm -rf ${REP_GLPI}
+        rm -rf ${REP_PM}
 }
-function update_glpi(){
+function update_pm(){
         info "Remise en place des dossiers marketplace et plugins"
-        cp -Rf ${REP_BACKUP}backup_glpi/plugins ${REP_GLPI} > /dev/null 2>&1
-        cp -Rf ${REP_BACKUP}backup_glpi/marketplace ${REP_GLPI} > /dev/null 2>&1
-        cat > ${REP_GLPI}inc/downstream.php << EOF
-<?php
-    define('GLPI_CONFIG_DIR', '/etc/glpi');
-    if (file_exists(GLPI_CONFIG_DIR . '/local_define.php')) {
-        require_once GLPI_CONFIG_DIR . '/local_define.php';
-    }
-EOF
+        cp -Rf ${REP_BACKUP}backup_pm/plugins ${REP_PM} > /dev/null 2>&1
+        cp -Rf ${REP_BACKUP}backup_pm/marketplace ${REP_PM} > /dev/null 2>&1
         info "Mise à jour de la base de donnée du site"
         if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
-            chown -R www-data:www-data ${REP_GLPI} > /dev/null 2>&1
-            sudo www-data php ${REP_GLPI}bin/console db:update --quiet --no-interaction --force  > /dev/null 2>&1
+            chown -R www-data:www-data ${REP_PM} > /dev/null 2>&1
+            sudo www-data php ${REP_PM}bin/console db:update --quiet --no-interaction --force  > /dev/null 2>&1
         elif [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
-            chown -R nginx:nginx ${REP_GLPI} > /dev/null 2>&1
-            semanage fcontext -a -t httpd_sys_rw_content_t "${REP_GLPI}(/.*)?" > /dev/null 2>&1
-            semanage fcontext -a -t httpd_sys_rw_content_t "${REP_GLPI}marketplace" > /dev/null 2>&1
-            restorecon -Rv ${REP_GLPI} > /dev/null 2>&1
-            restorecon -Rv ${REP_GLPI}marketplace > /dev/null 2>&1
-            sudo nginx php ${REP_GLPI}bin/console db:update --quiet --no-interaction --force  > /dev/null 2>&1
+            chown -R nginx:nginx ${REP_PM} > /dev/null 2>&1
+            semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}(/.*)?" > /dev/null 2>&1
+            semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}marketplace" > /dev/null 2>&1
+            restorecon -Rv ${REP_PM} > /dev/null 2>&1
+            restorecon -Rv ${REP_PM}marketplace > /dev/null 2>&1
+            sudo nginx php ${REP_PM}bin/console db:update --quiet --no-interaction --force  > /dev/null 2>&1
         fi
         
         info "Nettoyage de la mise à jour"
-        rm -rf ${REP_GLPI}install/install.php > /dev/null 2>&1
-        rm -Rf "$REP_BACKUP"backup_glpi > /dev/null 2>&1
+        rm -rf ${REP_PM}install/install.php > /dev/null 2>&1
+        rm -Rf "$REP_BACKUP"backup_pm > /dev/null 2>&1
 }
