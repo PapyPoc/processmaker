@@ -3,9 +3,9 @@
 # ProcessMaker function
 
 function warn(){
-    echo -e '\e[31m'"$1"'\e[0m';}
+    echo -e '\e[31m'"$1"'\e[0m'; }
 function info(){
-    echo -e '\e[36m'"$1"'\e[0m';}
+    echo -e '\e[36m'"$1"'\e[0m'; }
 function check_root(){
     # Vérification des privilèges root
     if [[ "$(id -u)" -ne 0 ]]; then
@@ -13,19 +13,19 @@ function check_root(){
             exit 0
     else
             info "Privilège Root: OK"
-    fi}
+    fi; }
 function compatible() {
     local version="$1"
     local -n versions_array="$2"
-    [[ ${versions_array[*]} =~ ${version} ]]}
+    [[ ${versions_array[*]} =~ ${version} ]]; }
 function check_distro(){
     # Vérifie si le fichier os-release existe
     if [ -f /etc/os-release ]; then
     # Source le fichier /etc/os-release pour obtenir les informations de la distribution
     source /etc/os-release
     # Vérifie si la distribution est basée sur Debian, Ubuntu, Alma Linux, Centos ou Rocky Linux
-        if [[ "${ID}" =~ ^(debian|ubuntu|almalinux|centos|rocky|rhel)$ ]]; then
-            if compatible "${VERSION_ID}" DEBIAN_VERSIONS || compatible "${VERSION_ID}" UBUNTU_VERSIONS || compatible "${VERSION_ID}" ALMA_VERSIONS || compatible "${VERSION_ID}" CENTOS_VERSIONS || compatible "${VERSION_ID}" ROCKY_VERSIONS || compatible "${VERSION_ID}" REDHAT_VERSIONS; then
+        if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
+            if compatible "${VERSION_ID}" ALMA_VERSIONS || compatible "${VERSION_ID}" CENTOS_VERSIONS || compatible "${VERSION_ID}" ROCKY_VERSIONS || compatible "${VERSION_ID}" REDHAT_VERSIONS; then
                 info "La version de votre systeme d'exploitation (${ID} ${VERSION_ID}) est compatible."
             else
                 warn "La version de votre système d'exploitation (${ID} ${VERSION_ID}) n'est pas considérée comme compatible."
@@ -50,7 +50,7 @@ function check_distro(){
     else
         warn "Il s'agit d'une autre distribution que Debian ou Ubuntu qui n'est pas compatible."
         exit 1
-    fi}
+    fi; }
 function check_install(){
     # Vérifie si le répertoire existe
     if [ -d "$1" ]; then
@@ -80,7 +80,7 @@ function check_install(){
     else
         warn "Nouvelle installation de ProcessMaker"
         install
-    fi}
+    fi; }
 function update_distro(){
     if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
         info "Recherche des mises à jour"
@@ -92,51 +92,46 @@ function update_distro(){
         dnf update -y > /dev/null 2>&1
         info "Application des mises à jour"
         dnf upgrade -y > /dev/null 2>&1
-    fi}
+    fi; }
 function network_info(){
     INTERFACE=$(ip route | awk 'NR==1 {print $5}')
-    IPADRESS=$(ip addr show "$INTERFACE" | grep inet | awk '{ print $2; }' | sed 's/\/.*$//' | head -n 1)
-    # HOST=$(hostname)}
+    IPADRESS=$(ip addr show "$INTERFACE" | grep inet | awk '{ print $2; }' | sed 's/\/.*$//' | head -n 1); }
 function install_packages(){
-    if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
-        sleep 1
-        dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm > /dev/null 2>&1
-        dnf module reset -y php nginx nodejs php > /dev/null 2>&1
-        dnf module switch-to -y nginx:1.24 nodejs:22 php:8.2 > /dev/null 2>&1
-        dnf module install -y php nginx nodejs > /dev/null 2>&1
-        dnf install -y mysql-server > /dev/null 2>&1
-        info "Activation des mises à jour automatique"
-        dnf install dnf-automatic -y > /dev/null 2>&1
-        sed -i 's/^\(;\?\)\(apply_updates =\).*/\2 yes/' /etc/dnf/automatic.conf
-        sed -i 's/^\(;\?\)\(reboot =\).*/\2 when-needed/' /etc/dnf/automatic.conf
-        sed -i 's/^\(;\?\)\(upgrade_type =\).*/\2 security/' /etc/dnf/automatic.conf
-        mkdir /etc/systemd/system/dnf-automatic.timer.d
-        echo "[Unit]" > /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        echo "Description=dnf-automatic timer" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        echo "ConditionPathExists=!/run/ostree-booted" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        echo "Wants=network-online.target" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        echo "[Timer]" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        echo "OnCalendar=*-*-* 6:00" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        echo "RandomizedDelaySec=60m" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        echo "Persistent=true" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
-        systemctl enable --now dnf-automatic.timer > /dev/null 2>&1
-        info "Installation des extensions de php"
-        dnf install -y php-{mysqlnd,mbstring,mbstring,soap,ldap,gd,curl,opcache,zip,bz2} > /dev/null 2>&1
-        info "Installation des service lamp..."
-        dnf install -y crontabs logrotate cronie tar perl curl jq > /dev/null 2>&1
-        sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
-        sed -i 's/^\(;\?\)\(group =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
-        info "Activation et démarrage de MySQL, d'ENGINE X et de PHP-FPM"
-        systemctl enable --now mysqld nginx php-fpm > /dev/null 2>&1
-        firewall-cmd --permanent --zone=public --add-service=http > /dev/null 2>&1
-        firewall-cmd --reload > /dev/null 2>&1
-    fi }
+    sleep 1
+    dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm > /dev/null 2>&1
+    dnf module reset -y php nginx nodejs php > /dev/null 2>&1
+    dnf module switch-to -y nginx:1.24 nodejs:22 php:8.2 > /dev/null 2>&1
+    dnf module install -y php nginx nodejs > /dev/null 2>&1
+    dnf install -y mysql-server > /dev/null 2>&1
+    info "Activation des mises à jour automatique"
+    dnf install dnf-automatic -y > /dev/null 2>&1
+    sed -i 's/^\(;\?\)\(apply_updates =\).*/\2 yes/' /etc/dnf/automatic.conf
+    sed -i 's/^\(;\?\)\(reboot =\).*/\2 when-needed/' /etc/dnf/automatic.conf
+    sed -i 's/^\(;\?\)\(upgrade_type =\).*/\2 security/' /etc/dnf/automatic.conf
+    mkdir /etc/systemd/system/dnf-automatic.timer.d
+    echo "[Unit]" > /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "Description=dnf-automatic timer" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "ConditionPathExists=!/run/ostree-booted" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "Wants=network-online.target" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "[Timer]" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "OnCalendar=*-*-* 6:00" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "RandomizedDelaySec=60m" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "Persistent=true" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    systemctl enable --now dnf-automatic.timer > /dev/null 2>&1
+    info "Installation des extensions de php"
+    dnf install -y php-{mysqlnd,mbstring,mbstring,soap,ldap,gd,curl,opcache,zip,bz2} > /dev/null 2>&1
+    info "Installation des service lamp..."
+    dnf install -y crontabs logrotate cronie tar perl curl jq > /dev/null 2>&1
+    sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
+    sed -i 's/^\(;\?\)\(group =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
+    info "Activation et démarrage de MySQL, d'ENGINE X et de PHP-FPM"
+    systemctl enable --now mysqld nginx php-fpm > /dev/null 2>&1
+    firewall-cmd --permanent --zone=public --add-service=http > /dev/null 2>&1
+    firewall-cmd --reload > /dev/null 2>&1; }
 function mysql_configure(){
     info "Configuration de Mysql"
-    #sleep 1
-    #(echo "y"; echo "2"; echo "$SQLROOTPWD\n"; echo "$SQLROOTPWD\n"; echo "y"; echo "y"; echo "y"; echo "y"; echo "y") | mysql_secure_installation > /dev/null 2>&1
     sleep 1
-    # Modify password to root
+    # Changing the root password
     mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLROOTPWD';" > /dev/null 2>&1
     # Grant privileges to the root user for all database
     mysql -u root -p$SQLROOTPWD -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';" > /dev/null 2>&1
@@ -161,38 +156,38 @@ function mysql_configure(){
     # Initialize time zones datas
     info "Configuration de TimeZone"
     mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p"$SQLROOTPWD" mysql > /dev/null 2>&1
-    echo "[mysqld]" > /etc/mysql/conf.d/my.cnf
-    echo "back_log = 16000" >> /etc/mysql/conf.d/my.cnf
-    echo "connect_timeout = 31536000" >> /etc/mysql/conf.d/my.cnf
-    echo "explicit_defaults_for_timestamp = ON" >> /etc/mysql/conf.d/my.cnf
-    echo "host_cache_size = 653" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_adaptive_hash_index = OFF" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_change_buffering = none" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_checksum_algorithm = none" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_checksums = OFF" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_doublewrite = OFF" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_flush_method = O_DIRECT" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_open_files = 6000" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_page_cleaners = 2" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_purge_batch_size = 600" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_purge_threads = 1" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_stats_persistent_sample_pages = 128" >> /etc/mysql/conf.d/my.cnf
-    echo "innodb_use_native_aio = OFF" >> /etc/mysql/conf.d/my.cnf
-    echo "interactive_timeout = 31536000" >> /etc/mysql/conf.d/my.cnf
-    echo "max_allowed_packet = 1073741824" >> /etc/mysql/conf.d/my.cnf
-    echo "max_connections = 1000" >> /etc/mysql/conf.d/my.cnf
-    echo "max_execution_time = 18446744073709551615" >> /etc/mysql/conf.d/my.cnf
-    echo "myisam_recover_options = OFF" >> /etc/mysql/conf.d/my.cnf
-    echo "open_files_limit = 65535" >> /etc/mysql/conf.d/my.cnf
-    echo "performance_schema = OFF" >> /etc/mysql/conf.d/my.cnf
-    echo "query_cache_size = 464717824" >> /etc/mysql/conf.d/my.cnf
-    echo "query_cache_type = ON" >> /etc/mysql/conf.d/my.cnf
-    echo "skip_name_resolve = ON" >> /etc/mysql/conf.d/my.cnf
-    echo "table_definition_cache = 20000" >> /etc/mysql/conf.d/my.cnf
-    echo "table_open_cache_instances = 4" >> /etc/mysql/conf.d/my.cnf
+    #echo "[mysqld]" > /etc/my.cnf.d/pm.cnf
+    echo "back_log = 16000" >> /etc/my.cnf.d/pm.cnf
+    echo "connect_timeout = 31536000" >> /etc/my.cnf.d/pm.cnf
+    echo "explicit_defaults_for_timestamp = ON" >> /etc/my.cnf.d/pm.cnf
+    echo "host_cache_size = 653" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_adaptive_hash_index = OFF" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_change_buffering = none" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_checksum_algorithm = none" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_checksums = OFF" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_doublewrite = OFF" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_flush_method = O_DIRECT" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_open_files = 6000" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_page_cleaners = 2" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_purge_batch_size = 600" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_purge_threads = 1" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_stats_persistent_sample_pages = 128" >> /etc/my.cnf.d/pm.cnf
+    echo "innodb_use_native_aio = OFF" >> /etc/my.cnf.d/pm.cnf
+    echo "interactive_timeout = 31536000" >> /etc/my.cnf.d/pm.cnf
+    echo "max_allowed_packet = 1073741824" >> /etc/my.cnf.d/pm.cnf
+    echo "max_connections = 1000" >> /etc/my.cnf.d/pm.cnf
+    echo "max_execution_time = 18446744073709551615" >> /etc/my.cnf.d/pm.cnf
+    echo "myisam_recover_options = OFF" >> /etc/my.cnf.d/pm.cnf
+    echo "open_files_limit = 65535" >> /etc/my.cnf.d/pm.cnf
+    echo "performance_schema = OFF" >> /etc/my.cnf.d/pm.cnf
+    echo "query_cache_size = 464717824" >> /etc/my.cnf.d/pm.cnf
+    echo "query_cache_type = ON" >> /etc/my.cnf.d/pm.cnf
+    echo "skip_name_resolve = ON" >> /etc/my.cnf.d/pm.cnf
+    echo "table_definition_cache = 20000" >> /etc/my.cnf.d/pm.cnf
+    echo "table_open_cache_instances = 4" >> /etc/my.cnf.d/pm.cnf
     # Restart MariaDB
-    systemctl restart mariadb
-    sleep 1 }
+    systemctl restart mysqld
+    sleep 1; }
 function install_ps(){
     info "Téléchargement et installation de la version ${NEW_VERSION} de ProcessMaker..."
     # Get download link for the latest release
@@ -202,7 +197,7 @@ function install_ps(){
 function setup_pm(){
     info "Configuration de ProcessMaker..."
     mkdir -p /var/log/processmaker
-    elif [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
+    if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
         chown -R nginx:nginx /var/log/processmaker
         chmod -R 777 /var/log/processmaker
         sleep 1
@@ -210,55 +205,46 @@ function setup_pm(){
         chown -R nginx:nginx ${REP_PM}
         chmod -R 777 ${REP_PM}
         sleep 1
-        cat > /etc/nginx/conf.d/pm.conf << EOF
-server {
-    listen 80;
-    server_name glpi.localhost;
-    root ${REP_PM}public;
-    location / {
-        try_files \$uri /index.php\$is_args\$args;
-    }
-    location ~ ^/index\.php$ {
-        # the following line needs to be adapted, as it changes depending on OS distributions and PHP versions
-        fastcgi_pass unix:/var/run/php-fpm/www.sock;
-        fastcgi_split_path_info ^(.+\.php)(/.*)$;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-    }
-}
-EOF
-        cat > /etc/logrotate.d/glpi << EOF
+        echo "server {"                                                                     > /etc/nginx/conf.d/pm.conf
+        echo "    listen 80;"                                                               >> /etc/nginx/conf.d/pm.conf
+        echo "    server_name pm.localhost;"                                                >> /etc/nginx/conf.d/pm.conf
+        echo "    root ${REP_PM}public;"                                                     >> /etc/nginx/conf.d/pm.conf
+        echo "    location / {"                                                              >> /etc/nginx/conf.d/pm.conf
+        echo "        try_files \$uri /index.php\$is_args\$args;"                           >> /etc/nginx/conf.d/pm.conf
+        echo "    }"                                                                        >> /etc/nginx/conf.d/pm.conf
+        echo "    location ~ ^/index\.php$ {"                                               >> /etc/nginx/conf.d/pm.conf
+        echo "        fastcgi_pass unix:/var/run/php-fpm/www.sock;"                         >> /etc/nginx/conf.d/pm.conf
+        echo "        fastcgi_split_path_info ^(.+\.php)(/.*)$;"                            >> /etc/nginx/conf.d/pm.conf
+        echo "        include fastcgi_params;"                                              >> /etc/nginx/conf.d/pm.conf
+        echo "        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;"  >> /etc/nginx/conf.d/pm.conf
+        echo "    }"                                                                        >> /etc/nginx/conf.d/pm.conf
+        echo "}"                                                                            >> /etc/nginx/conf.d/pm.conf
+#        cat > /etc/logrotate.d/pm << EOF
 # Rotate ProcessMaker logs daily, only if not empty
 # Save 14 days old logs under compressed mode
-/var/lib/glpi/files/_log/*.log {
-    su nginx nginx
-    daily
-    rotate 14
-    compress
-    notifempty
-    missingok
-    create 644 nginx nginx
-}
-EOF
-    chmod 0644 /etc/logrotate.d/glpi
-    chown root:root /etc/logrotate.d/glpi
-    chcon system_u:object_r:etc_t:s0 /etc/logrotate.d/glpi
-    sed -i 's/^\(;\?\)\(session.cookie_httponly\).*/\2 = on/' /etc/php.ini > /dev/null 2>&1
-    setsebool -P httpd_can_network_connect on
-    setsebool -P httpd_can_network_connect_db on
-    setsebool -P httpd_can_sendmail on
-    semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}(/.*)?" > /dev/null 2>&1
-    semanage fcontext -a -t httpd_sys_rw_content_t "/var/lib/glpi(/.*)?" > /dev/null 2>&1
-    semanage fcontext -a -t httpd_sys_rw_content_t "/var/log/processmaker(/.*)?" > /dev/null 2>&1
-    semanage fcontext -a -t httpd_sys_rw_content_t "/etc/glpi(/.*)?" > /dev/null 2>&1
-    semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}marketplace" > /dev/null 2>&1
-    restorecon -R ${REP_PM} > /dev/null 2>&1
-    restorecon -R /var/lib/glpi > /dev/null 2>&1
-    restorecon -R /var/log/processmaker > /dev/null 2>&1
-    restorecon -R /etc/glpi > /dev/null 2>&1
-    restorecon -R ${REP_PM}marketplace > /dev/null 2>&1
-    # Restart de Nginx et php-fpm
-    systemctl restart nginx php-fpm
+#/var/lib/glpi/files/_log/*.log {
+#    su nginx nginx
+#    daily
+#    rotate 14
+#    compress
+#    notifempty
+#    missingok
+#    create 644 nginx nginx
+#}
+#EOF
+#    chmod 0644 /etc/logrotate.d/glpi
+#    chown root:root /etc/logrotate.d/glpi
+#    chcon system_u:object_r:etc_t:s0 /etc/logrotate.d/glpi
+        sed -i 's/^\(;\?\)\(session.cookie_httponly\).*/\2 = on/' /etc/php.ini > /dev/null 2>&1
+        setsebool -P httpd_can_network_connect on
+        setsebool -P httpd_can_network_connect_db on
+        setsebool -P httpd_can_sendmail on
+        semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}(/.*)?" > /dev/null 2>&1
+        semanage fcontext -a -t httpd_sys_rw_content_t "/var/log/processmaker(/.*)?" > /dev/null 2>&1
+        restorecon -R ${REP_PM} > /dev/null 2>&1
+        restorecon -R /var/log/processmaker > /dev/null 2>&1
+        # Restart de Nginx et php-fpm
+        systemctl restart nginx php-fpm
    fi
     sleep 5
     rm -rf ${REP_PM}install/install.php
