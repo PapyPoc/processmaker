@@ -21,10 +21,10 @@ install_pm
 sleep 5
 setup_pm
 sleep 5
-maj_user_pm
+#maj_user_pm
 display_credentials
 write_credentials
-efface_script
+#efface_script
 
 function update(){
     maintenance "1"

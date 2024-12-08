@@ -188,12 +188,12 @@ function mysql_configure(){
     # Restart MariaDB
     systemctl restart mysqld
     sleep 1; }
-function install_ps(){
+function install_pm(){
     info "Téléchargement et installation de la version ${NEW_VERSION} de ProcessMaker..."
     # Get download link for the latest release
     DOWNLOADLINK=$(curl -s  https://api.github.com/repos/ProcessMaker/processmaker/releases/latest | jq -r '.assets[0].browser_download_url')
-    wget -O /tmp/ps-latest.tgz "$DOWNLOADLINK" > /dev/null 2>&1
-    tar xzf /tmp/ps-latest.tgz -C /opt/processmaker }
+    wget -O /tmp/pm-latest.tgz "$DOWNLOADLINK" > /dev/null 2>&1
+    tar xzf /tmp/pm-latest.tgz -C /opt/processmaker; }
 function setup_pm(){
     info "Configuration de ProcessMaker..."
     mkdir -p /var/log/processmaker
@@ -219,22 +219,22 @@ function setup_pm(){
         echo "        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;"  >> /etc/nginx/conf.d/pm.conf
         echo "    }"                                                                        >> /etc/nginx/conf.d/pm.conf
         echo "}"                                                                            >> /etc/nginx/conf.d/pm.conf
-#        cat > /etc/logrotate.d/pm << EOF
+        cat > /etc/logrotate.d/pm << EOF
 # Rotate ProcessMaker logs daily, only if not empty
 # Save 14 days old logs under compressed mode
-#/var/lib/glpi/files/_log/*.log {
-#    su nginx nginx
-#    daily
-#    rotate 14
-#    compress
-#    notifempty
-#    missingok
-#    create 644 nginx nginx
-#}
-#EOF
-#    chmod 0644 /etc/logrotate.d/glpi
-#    chown root:root /etc/logrotate.d/glpi
-#    chcon system_u:object_r:etc_t:s0 /etc/logrotate.d/glpi
+/var/log/processmaker/*.log {
+    su nginx nginx
+    daily
+    rotate 14
+    compress
+    notifempty
+    missingok
+    create 644 nginx nginx
+}
+EOF
+        chmod 0644 /etc/logrotate.d/pm
+        chown root:root /etc/logrotate.d/pm
+        chcon system_u:object_r:etc_t:s0 /etc/logrotate.d/pm
         sed -i 's/^\(;\?\)\(session.cookie_httponly\).*/\2 = on/' /etc/php.ini > /dev/null 2>&1
         setsebool -P httpd_can_network_connect on
         setsebool -P httpd_can_network_connect_db on
@@ -247,38 +247,24 @@ function setup_pm(){
         systemctl restart nginx php-fpm
    fi
     sleep 5
-    rm -rf ${REP_PM}install/install.php
-    sleep 5
-    sed -i '$i \   public $date_default_timezone_set = ("'${TIMEZONE}'");' /etc/glpi/config/config_db.php
+    #rm -rf ${REP_PM}install/install.php
+    #sleep 5
+    #sed -i '$i \   public $date_default_timezone_set = ("'${TIMEZONE}'");' /etc/glpi/config/config_db.php
     # Change timezone and language
-    mysql -e "INSERT INTO glpi.glpi_configs (context, name, value) VALUES ('core', 'timezone', '${TIMEZONE}');" > /dev/null 2>&1
-    mysql -e "UPDATE glpi.glpi_configs SET value = "${LANG}" WHERE name = 'language';" > /dev/null 2>&1
-    if [[ "${ID}" =~ ^(debian|ubuntu)$ ]]; then
-        # Change permissions
-        chown -Rc www-data:www-data /etc/glpi
-        chmod -R 755 /etc/glpi
-        chown -Rc www-data:www-data /var/log/processmaker
-        chmod -R 755 /var/log/processmaker
-        chown -Rc www-data:www-data ${REP_PM}
-        chmod -R 755 ${REP_PM}
-        systemctl restart apache2
-        # Setup Cron task
-        echo "*/2 * * * * www-data /usr/bin/php ${REP_PM}front/cron.php &>/dev/null" >> /etc/cron.d/glpi
-    elif [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
+    #mysql -e "INSERT INTO glpi.glpi_configs (context, name, value) VALUES ('core', 'timezone', '${TIMEZONE}');" > /dev/null 2>&1
+    #mysql -e "UPDATE glpi.glpi_configs SET value = "${LANG}" WHERE name = 'language';" > /dev/null 2>&1
+    if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
          # Change permissions
-        chown -R nginx:nginx /etc/glpi
-        chmod -R 755 /etc/glpi
         chown -R nginx:nginx /var/log/processmaker
         chmod -R 755 /var/log/processmaker
         chown -R nginx:nginx ${REP_PM}
         chmod -R 755 ${REP_PM}
         systemctl restart nginx php-fpm
-        echo "*/2 * * * * nginx /usr/bin/php ${REP_PM}front/cron.php &>/dev/null" >> /etc/cron.d/glpi
     fi }
 function maj_user_pm(){
     info "Changement des mots de passe de ProcessMaker..."
     # Changer le mot de passe de l'admin glpi 
-    mysql -u pm_user -p"${SQLPMPWD}" -e "USE pm; UPDATE pm_users SET password = MD5('${ADMINPMPWD}') WHERE name = 'glpi';"
+    #mysql -u pm_user -p"${SQLPMPWD}" -e "USE processmaker; UPDATE pm_users SET password = MD5('${ADMINPMPWD}') WHERE name = 'glpi';"
 function display_credentials(){
     info "<==========================> Détail de l'installation de ProcessMaker <=================================>"
     info "ProcessMaker Version: ${NEW_VERSION}"
@@ -287,14 +273,15 @@ function display_credentials(){
     echo ""
     info "Les comptes utilisateurs par défaut sont :"
     info "UTILISATEUR  -  MOT DE PASSE       -  ACCES"
-    info "glpi         -  ${ADMINPMPWD}       -  compte admin"
+    info "pm           -  ${ADMINPMPWD}       -  compte admin"
     echo ""
     info "Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :"
     info "http://${IPADRESS}" 
     echo ""
     info "==> Database:"
     info "Mot de passe root: ${SLQROOTPWD}"
-    info "Nom de la base de données ProcessMaker: glpi"
+    info "Mot de passe glpi_user: ${SQLPMPWD}"
+    info "Nom de la base de données ProcessMaker: processmaker"
     info "<===============================================================================================>"
     echo ""
     info "Si vous rencontrez un problème avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues"
@@ -308,17 +295,15 @@ Il est important d'enregistrer ces informations. Si vous les perdez, elles seron
 
 Les comptes utilisateurs par défaut sont :
 UTILISATEUR       -  MOT DE PASSE       -  ACCES
-info "glpi        -  ${ADMINPMPWD}       -  compte admin"
-info "post-only   -  ${POSTPMPWD}       -  compte post-only"
-info "tech        -  ${TECHPMPWD}       -  compte tech"
-info "normal      -  ${NORMPMPWD}       -  compte normal"
+info "pm          -  ${ADMINPMPWD}       -  compte admin"
 
 Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :
 http://${IPADRESS}
 
 ==> Database:
 Mot de passe root: ${SLQROOTPWD}
-Nom de la base de données ProcessMaker: glpi
+Mot de passe glpi_user: ${SQLPMPWD}
+Nom de la base de données ProcessMaker: processmaker
 <===============================================================================================>
 
 Si vous rencontrez un probléme avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues

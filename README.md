@@ -1,6 +1,6 @@
 # Process Maker
 
-## Installation automatique d'un serveur Process Maker
+## Installation automatique d'un serveur Process Maker sur une distribution RHEL
 
 
  ![Image](https://www.processmaker.com/wp-content/uploads/2024/07/processmaker-business-process-automation-platform.webp)
