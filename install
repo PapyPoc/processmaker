@@ -9,7 +9,6 @@
 source ./processmaker/conf
 source ./processmaker/function
 clear
-check_root
 # Vérifier que les fichiers de log sont accessibles
 if ! touch "$SUCCESS_LOG" "$ERROR_LOG" 2>/dev/null; then
     echo "Erreur : Impossible de créer ou écrire dans les fichiers de log" >&2
@@ -23,14 +22,6 @@ done)
 exec 2> >(while read -r line; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') [ERREUR] $line" >> "$ERROR_LOG"
 done)
-# Début du script
-#log_and_display "Mise à jour de la distribution en cours..."
-# Mise à jour du système
-#log_and_display "Mise à jour de la distribution en cours..."
-#dnf -y update
-#dnf clean all
-# Fin du script
-#log_and_display "Mise à jour terminée."
 # Vérification des privilèges root
 if [[ "$(id -u)" -ne 0 ]]; then
     log_and_display "Ce script doit étre exécuté en tant que root"
@@ -42,7 +33,7 @@ fi
 source /etc/os-release
 # Vérifie si la distribution est basée sur Debian, Ubuntu, Alma Linux, Centos ou Rocky Linux
 if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
-    if compatible ("${VERSION_ID}" ALMA_VERSIONS) || compatible ("${VERSION_ID}" CENTOS_VERSIONS) || compatible ("${VERSION_ID}" ROCKY_VERSIONS) || compatible ("${VERSION_ID}" REDHAT_VERSIONS); then
+    if compatible "${VERSION_ID}" ALMA_VERSIONS || compatible "${VERSION_ID}" CENTOS_VERSIONS || compatible "${VERSION_ID}" ROCKY_VERSIONS || compatible "${VERSION_ID}" REDHAT_VERSIONS; then
         log_and_display "La version de votre systeme d'exploitation (${ID} ${VERSION_ID}) est compatible."
     else
         log_and_display "La version de votre système d'exploitation (${ID} ${VERSION_ID}) n'est pas considérée comme compatible."
