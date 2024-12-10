@@ -2,18 +2,20 @@
 #
 # ProcessMaker variable
 
+# shellcheck disable=SC2034
 ALMA_VERSIONS=("9.5") # Constante pour les versions d'Almalinux acceptables
 CENTOS_VERSIONS=("9") # Constante pour les versions de Centos acceptables
 ROCKY_VERSIONS=("9.5") # Constante pour les versions de Rocky Linux acceptables
 REDHAT_VERSIONS=("9.5") # Constante pour les versions de Red Hat acceptables
 REP_SCRIPT="/root/processmaker" # Constante pour le script d'installation de PS
-REP_BACKUP="/root/pm_sauve/" # Constante pour le répertoire de sauvergarde avant MàJ
-REP_PM="/opt/processmaker/" # Constante pour le répertoire d'installation du site Web PS
+REP_PM="/opt/" # Constante pour le répertoire d'installation du site Web PS
 SQLROOTPWD=$(openssl rand -base64 48 | cut -c1-18) # Constante pour le MdP root de MariaDB
 SQLPSPWD=$(openssl rand -base64 48 | cut -c1-18) # Constante pour le MdP PS de MariaDB
 ADMINPMPWD=$(openssl rand -base64 48 | cut -c1-12) # Constante pour pour le MdP du compte PS de PS
-CURRENT_DATE_TIME=$(date +"%d-%m-%Y_%H-%M-%S") # Constante pour la date courante
-BDD_BACKUP="bdd_pm-${CURRENT_DATE_TIME}.sql" # Constante pour le nommage du fichier DUMP de la BDD de PS
-NEW_VERSION=$(curl -s https://api.github.com/repos/ProcessMaker/processmaker/releases/latest | jq -r '.name') # Constante pour la dernière version de PS
-TIMEZONE=$(timedatectl | grep "Time zone" | awk '{print $3}')
-LANG=$(locale | grep LANG | cut -d= -f2 | cut -d. -f1)
+NEW_VERSION=$(curl -s https://api.github.com/repos/tomolimo/processmaker-server/releases/latest | jq -r '.name') # Constante pour la dernière version de PS
+TIMEZONE=$(timedatectl | grep "Time zone" | awk '{print $3}') # Récupere le TimeZone du systéme
+LANG=$(locale | grep LANG | cut -d= -f2 | cut -d. -f1) # Récupere la langue du systéme
+INTERFACE=$(ip route | awk 'NR==1 {print $5}') # Récupere l'interface réseau du systéme
+IPADRESS=$(ip addr show "$INTERFACE" | grep inet | awk '{ print $2; }' | sed 's/\/.*$//' | head -n 1) # Récupere l'adresse IP du systéme
+SUCCESS_LOG="./processmaker/success.log" # Fichiers pour les logs success
+ERROR_LOG="./processmaker/error.log" # Fichiers pour les logs erreur

@@ -3,34 +3,315 @@
 # ProcessMaker install script
 # Author: PapyPoc
 # Version: 1.0.0
-# ProcessMaker BPM Core : https://github.com/ProcessMaker/processmaker/tree/release-2024-fall
+# ProcessMaker BPM Core : https://github.com/tomolimo/processmaker-server/tree/main
 #
 
 source ./processmaker/conf
 source ./processmaker/function
-
 clear
 check_root
-check_distro
-update_distro
-install_packages
-network_info
-mariadb_configure
-sleep 5
-install_pm
-sleep 5
-setup_pm
-sleep 5
-#maj_user_pm
-display_credentials
-write_credentials
-#efface_script
-
-function update(){
-    maintenance "1"
-    backup_pm
-    install_pm
-    update_pm
-    maintenance "0"
-    efface_script
+# Vérifier que les fichiers de log sont accessibles
+if ! touch "$SUCCESS_LOG" "$ERROR_LOG" 2>/dev/null; then
+    echo "Erreur : Impossible de créer ou écrire dans les fichiers de log" >&2
+    exit 1
+fi
+# Rediriger stdout des commandes (sauf echo) vers un fichier de log
+exec > >(while read -r line; do
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $line" >> "$SUCCESS_LOG"
+done)
+# Rediriger stderr vers un fichier de log
+exec 2> >(while read -r line; do
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [ERREUR] $line" >> "$ERROR_LOG"
+done)
+# Début du script
+#log_and_display "Mise à jour de la distribution en cours..."
+# Mise à jour du système
+#log_and_display "Mise à jour de la distribution en cours..."
+#dnf -y update
+#dnf clean all
+# Fin du script
+#log_and_display "Mise à jour terminée."
+# Vérification des privilèges root
+if [[ "$(id -u)" -ne 0 ]]; then
+    log_and_display "Ce script doit étre exécuté en tant que root"
+    exit 1
+else
+    log_and_display "Privilège Root: OK"
+fi
+# Source le fichier /etc/os-release pour obtenir les informations de la distribution
+source /etc/os-release
+# Vérifie si la distribution est basée sur Debian, Ubuntu, Alma Linux, Centos ou Rocky Linux
+if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
+    if compatible ("${VERSION_ID}" ALMA_VERSIONS) || compatible ("${VERSION_ID}" CENTOS_VERSIONS) || compatible ("${VERSION_ID}" ROCKY_VERSIONS) || compatible ("${VERSION_ID}" REDHAT_VERSIONS); then
+        echo "La version de votre systeme d'exploitation (${ID} ${VERSION_ID}) est compatible."
+    else
+        echo "La version de votre système d'exploitation (${ID} ${VERSION_ID}) n'est pas considérée comme compatible."
+        echo "Voulez-vous toujours forcer l'installation ? Attention, si vous choisissez de forcer le script, c'est à vos risques et périls."
+        echo "Etes-vous sûr de vouloir continuer ? [Oui/Non]"
+        read -r response
+        case "$response" in
+            O|o)
+                echo "Continuing..."
+                ;;
+            N|n)
+                echo "Exiting..."
+                exit 1
+                ;;
+            *)
+                echo "Réponse non valide. Quitter..."
+                exit 1
+                ;;
+        esac
+    fi
+    # Vérifie si le répertoire existe
+    if [ -d "$1" ]; then
+        output=$(php ${REP_PM}bin/console -V 2>&1)
+        sleep 2
+        glpi_cli_version=$(sed -n 's/.*GLPI CLI \([^ ]*\).*/\1/p' <<< $output)
+        log_and_display "Le site est déjà installé. Version $glpi_cli_version"
+        log_and_display "Nouvelle version trouver : ProcessMaker version $NEW_VERSION"
+        if [ "$glpi_cli_version" == "$NEW_VERSION" ]; then
+            echo "Vous avez déjà la dernière version de ProcessMaker. Mise à jour annuler"
+            sleep 5
+            exit 0;
+        else
+            echo "Voulez-vous mettre à jour ProcessMaker (O/N): "
+            read -r MaJ
+            case "$MaJ" in
+                "O" | "o")
+                    update
+                    exit 0;;
+                "N" | "n")
+                    echo "Sortie du programme."
+                    efface_script
+                    exit 0;;
+                *)
+                    echo "Action non reconnue. Sortie du programme."
+                    efface_script
+                    exit 0;;
+            esac
+        fi
+    else
+        echo "Nouvelle installation de ProcessMaker"
+        install
+    fi
+    function update_distro(){
+    echo "Recherche des mises à jour"
+    dnf update -y
+    echo "Application des mises à jour"
+    dnf upgrade -y
+    sleep 1
+    dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+    dnf module reset -y php nginx nodejs php
+    dnf module switch-to -y nginx:1.24 nodejs:22 php:8.2
+    dnf module install -y php nginx nodejs
+    dnf install -y mysql-server phpmyadmin 
+    echo "Activation des mises à jour automatique"
+    dnf install dnf-automatic -y
+    sed -i 's/^\(;\?\)\(apply_updates =\).*/\2 yes/' /etc/dnf/automatic.conf
+    sed -i 's/^\(;\?\)\(reboot =\).*/\2 when-needed/' /etc/dnf/automatic.conf
+    sed -i 's/^\(;\?\)\(upgrade_type =\).*/\2 security/' /etc/dnf/automatic.conf
+    mkdir /etc/systemd/system/dnf-automatic.timer.d
+    echo "[Unit]" > /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "Description=dnf-automatic timer" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "ConditionPathExists=!/run/ostree-booted" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "Wants=network-online.target" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "[Timer]" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "OnCalendar=*-*-* 6:00" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "RandomizedDelaySec=60m" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    echo "Persistent=true" >> /etc/systemd/system/dnf-automatic.timer.d/override.conf
+    systemctl enable --now dnf-automatic.timer
+    echo "Installation des extensions de php"
+    dnf install -y php-{php-gd php-mysql php-xml php-soap php-mbstring php-ldap php-cli php-curl}
+    echo "Installation des service lamp..."
+    dnf install -y crontabs logrotate cronie tar perl curl jq
+    sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
+    sed -i 's/^\(;\?\)\(group =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
+    echo "Activation et démarrage de MySQL, d'ENGINE X et de PHP-FPM"
+    systemctl enable --now nginx mysqld php-fpm
+    firewall-cmd --permanent --zone=public --add-service=http
+    firewall-cmd --reload;
+    echo "Configuration de Mysql"
+    sleep 1
+    # Changing the root password
+    mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLROOTPWD';"
+    # Grant privileges to the root user for all database
+    mysql -u root -p$SQLROOTPWD -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';"
+    # Remove anonymous users
+    mysql -u root -p$SQLROOTPWD -e "DELETE FROM user WHERE User='';"
+    # Disallow root login remotely
+    mysql -u root -p$SQLROOTPWD -e "UPDATE mysql.user SET Host='localhost' WHERE User='root';"
+    # Remove test database and access to it
+    mysql -u root -p$SQLROOTPWD -e "DROP DATABASE test;"
+    # Reload privilege tables now
+    mysql -u root -p$SQLROOTPWD -e "FLUSH PRIVILEGES;"
+    # Create a new database
+    mysql -u root -p$SQLROOTPWD -e "CREATE DATABASE processmaker;"
+    # Create a new user
+    mysql -u root -p$SQLROOTPWD -e "CREATE USER 'pm_user'@'localhost' IDENTIFIED BY '$SQLPMPWD';"
+    # Grant privileges to the new user for the new database
+    mysql -u root -p$SQLROOTPWD -e "GRANT ALL PRIVILEGES ON processmaker.* TO 'pm_user'@'localhost';"
+    # Reload privileges
+    mysql -u root -p$SQLROOTPWD -e "FLUSH PRIVILEGES;"
+    # 
+    mysql -u root -p$SQLROOTPWD -e "GRANT SELECT ON mysql.time_zone_name TO 'pm_user'@'localhost'"
+    # Initialize time zones datas
+    echo "Configuration de TimeZone"
+    mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p"$SQLROOTPWD" mysql
+    #echo "[mysqld]" > /etc/my.cnf.d/pm.cnf
+    #echo "back_log = 16000" >> /etc/my.cnf.d/pm.cnf
+    #echo "connect_timeout = 31536000" >> /etc/my.cnf.d/pm.cnf
+    #echo "explicit_defaults_for_timestamp = ON" >> /etc/my.cnf.d/pm.cnf
+    #echo "host_cache_size = 653" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_adaptive_hash_index = OFF" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_change_buffering = none" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_checksum_algorithm = none" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_checksums = OFF" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_doublewrite = OFF" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_flush_method = O_DIRECT" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_open_files = 6000" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_page_cleaners = 2" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_purge_batch_size = 600" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_purge_threads = 1" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_stats_persistent_sample_pages = 128" >> /etc/my.cnf.d/pm.cnf
+    #echo "innodb_use_native_aio = OFF" >> /etc/my.cnf.d/pm.cnf
+    #echo "interactive_timeout = 31536000" >> /etc/my.cnf.d/pm.cnf
+    #echo "max_allowed_packet = 1073741824" >> /etc/my.cnf.d/pm.cnf
+    #echo "max_connections = 1000" >> /etc/my.cnf.d/pm.cnf
+    #echo "max_execution_time = 18446744073709551615" >> /etc/my.cnf.d/pm.cnf
+    #echo "myisam_recover_options = OFF" >> /etc/my.cnf.d/pm.cnf
+    #echo "open_files_limit = 65535" >> /etc/my.cnf.d/pm.cnf
+    #echo "performance_schema = OFF" >> /etc/my.cnf.d/pm.cnf
+    #echo "query_cache_size = 464717824" >> /etc/my.cnf.d/pm.cnf
+    #echo "query_cache_type = ON" >> /etc/my.cnf.d/pm.cnf
+    #echo "skip_name_resolve = ON" >> /etc/my.cnf.d/pm.cnf
+    #echo "table_definition_cache = 20000" >> /etc/my.cnf.d/pm.cnf
+    #echo "table_open_cache_instances = 4" >> /etc/my.cnf.d/pm.cnf
+    # Restart MariaDB
+    systemctl restart mysqld
+    sleep 1; 
+    echo "Téléchargement et installation de la version ${NEW_VERSION} de ProcessMaker..."
+    # Get download link for the latest release
+    DOWNLOADLINK=$(curl -s  https://api.github.com/repos/tomolimo/processmaker-server/releases/latest | jq -r '.assets[0].browser_download_url')
+    wget -O /tmp/pm-latest.zip "$DOWNLOADLINK"
+    unzip /tmp/pm-latest.zip -d /opt/
+    echo "Configuration de ProcessMaker..."
+    mkdir -p /var/log/processmaker
+    chown -R nginx:nginx /var/log/processmaker
+    chmod -R 777 /var/log/processmaker
+    sleep 1
+    # Add permissions
+    chown -R nginx:nginx ${REP_PM}
+    chmod -R 777 ${REP_PM}
+    sleep 1
+    echo "server {" > /etc/nginx/conf.d/pm.conf
+    echo "    listen 80;" >> /etc/nginx/conf.d/pm.conf
+    echo "    server_name pm.localhost;" >> /etc/nginx/conf.d/pm.conf
+    echo "    root ${REP_PM}public;" >> /etc/nginx/conf.d/pm.conf
+    echo "    location / {" >> /etc/nginx/conf.d/pm.conf
+    echo "        try_files \$uri /index.php\$is_args\$args;" >> /etc/nginx/conf.d/pm.conf
+    echo "    }" >> /etc/nginx/conf.d/pm.conf
+    echo "    location ~ ^/index\.php$ {" >> /etc/nginx/conf.d/pm.conf
+    echo "        fastcgi_pass unix:/var/run/php-fpm/www.sock;" >> /etc/nginx/conf.d/pm.conf
+    echo "        fastcgi_split_path_info ^(.+\.php)(/.*)$;" >> /etc/nginx/conf.d/pm.conf
+    echo "        include fastcgi_params;" >> /etc/nginx/conf.d/pm.conf
+    echo "        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;" >> /etc/nginx/conf.d/pm.conf
+    echo "    }" >> /etc/nginx/conf.d/pm.conf
+    echo "}" >> /etc/nginx/conf.d/pm.conf
+    echo "# Rotate ProcessMaker logs daily, only if not empty" > /etc/logrotate.d/pm
+    echo "# Save 14 days old logs under compressed mode" >> /etc/logrotate.d/pm
+    echo "/var/log/processmaker/*.log {" >> /etc/logrotate.d/pm
+    echo "    su nginx nginx" >> /etc/logrotate.d/pm
+    echo "    daily" >> /etc/logrotate.d/pm
+    echo "    rotate 14" >> /etc/logrotate.d/pm
+    echo "    compress" >> /etc/logrotate.d/pm
+    echo "    notifempty" >> /etc/logrotate.d/pm
+    echo "    missingok" >> /etc/logrotate.d/pm
+    echo "    create 644 nginx nginx" >> /etc/logrotate.d/pm
+    echo "}" >> /etc/logrotate.d/pm
+    chmod 0644 /etc/logrotate.d/pm
+    chown root:root /etc/logrotate.d/pm
+    chcon system_u:object_r:etc_t:s0 /etc/logrotate.d/pm
+    sed -i 's/^\(;\?\)\(session.cookie_httponly\).*/\2 = on/' /etc/php.ini
+    setsebool -P httpd_can_network_connect on
+    setsebool -P httpd_can_network_connect_db on
+    setsebool -P httpd_can_sendmail on
+    semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}(/.*)?"
+    semanage fcontext -a -t httpd_sys_rw_content_t "/var/log/processmaker(/.*)?"
+    restorecon -R ${REP_PM}
+    restorecon -R /var/log/processmaker
+    # Restart de Nginx et php-fpm
+    systemctl restart nginx php-fpm
+    sleep 5
+    #rm -rf ${REP_PM}install/install.php
+    #sleep 5
+    #sed -i '$i \   public $date_default_timezone_set = ("'${TIMEZONE}'");' /etc/glpi/config/config_db.php
+    
+    # Change timezone and language
+    #mysql -e "INSERT INTO glpi.glpi_configs (context, name, value) VALUES ('core', 'timezone', '${TIMEZONE}');"
+    #mysql -e "UPDATE glpi.glpi_configs SET value = "${LANG}" WHERE name = 'language';"
+    
+    # Change permissions
+    chown -R nginx:nginx /var/log/processmaker
+    chmod -R 755 /var/log/processmaker
+    chown -R nginx:nginx ${REP_PM}
+    chmod -R 755 ${REP_PM}
+    systemctl restart nginx php-fpm }
+    
+    # maj_user_pm
+    echo "Changement des mots de passe de ProcessMaker..."
+    # Changer le mot de passe de l'admin glpi 
+    #mysql -u pm_user -p"${SQLPMPWD}" -e "USE processmaker; UPDATE pm_users SET password = MD5('${ADMINPMPWD}') WHERE name = 'glpi';"
+    
+    # display_credentials
+    echo "<==========================> Détail de l'installation de ProcessMaker <=================================>"
+    echo "ProcessMaker Version: ${NEW_VERSION}"
+    echo "Répertoire d'installation de ProcessMaker: ${REP_PM}"
+    echo "Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables."
+    echo ""
+    echo "Les comptes utilisateurs par défaut sont :"
+    echo "UTILISATEUR  -  MOT DE PASSE       -  ACCES"
+    echo "pm           -  ${ADMINPMPWD}       -  compte admin"
+    echo ""
+    echo "Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :"
+    echo "http://${IPADRESS}" 
+    echo ""
+    echo "==> Database:"
+    echo "Mot de passe root: ${SLQROOTPWD}"
+    echo "Mot de passe glpi_user: ${SQLPMPWD}"
+    echo "Nom de la base de données ProcessMaker: processmaker"
+    echo "<===============================================================================================>"
+    echo ""
+    echo "Si vous rencontrez un problème avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues"
+    
+    # write_credentials
+    echo "<==========================> Détail de l'installation de ProcessMaker <=================================" > /root/sauve_mdp.txt
+    echo "ProcessMaker Version: ${NEW_VERSION}" > /root/sauve_mdp.txt
+    echo "Répertoire d'installation de ProcessMaker: ${REP_PM}" >> /root/sauve_mdp.txt
+    echo "Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables." >> /root/sauve_mdp.txt
+    echo "" >> /root/sauve_mdp.txt
+    echo "Les comptes utilisateurs par défaut sont :" >> /root/sauve_mdp.txt
+    echo "UTILISATEUR       -  MOT DE PASSE       -  ACCES" >> /root/sauve_mdp.txt
+    echo "pm          -  ${ADMINPMPWD}       -  compte admin" >> /root/sauve_mdp.txt
+    echo "" >> /root/sauve_mdp.txt
+    echo "Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :" >> /root/sauve_mdp.txt
+    echo "http://${IPADRESS}" >> /root/sauve_mdp.txt
+    echo "" >> /root/sauve_mdp.txt
+    echo "==> Database:" >> /root/sauve_mdp.txt
+    echo "Mot de passe root: ${SLQROOTPWD}" >> /root/sauve_mdp.txt
+    echo "Mot de passe glpi_user: ${SQLPMPWD}" >> /root/sauve_mdp.txt
+    echo "Nom de la base de données ProcessMaker: processmaker" >> /root/sauve_mdp.txt
+    echo "<===============================================================================================>" >> /root/sauve_mdp.txt
+    echo "" >> /root/sauve_mdp.txt
+    echo "Si vous rencontrez un probléme avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues" >> /root/sauve_mdp.txt
+    chmod 700 /root/sauve_mdp.txt
+    echo ""
+    echo "Fichier de sauve_mdp.txt enregistrer dans /home"
+    echo ""
+    # Vérifie si le répertoire existe
+    #if [ -e "$REP_SCRIPT" ]; then
+    #        echo "Le script est déjà présent."
+    #        echo "Effacement en cours"
+    #        rm -Rf "$REP_SCRIPT"
+    #fi
 }
