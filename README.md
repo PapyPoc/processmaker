@@ -21,5 +21,5 @@ Process Maker is installed by running the following command in your terminal.
 >⚠️ Git must be installed on your system  ```dnf install -y git``` 
 
 ```
-git clone https://github.com/PapyPoc/processmaker.git -b main && chmod -R +x processmaker && ./processmaker/install
+git clone https://github.com/PapyPoc/processmaker.git -b dev && chmod -R +x processmaker && ./processmaker/install
 ```
