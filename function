@@ -9,4 +9,5 @@ function compatible() {
 # Fonction pour gérer les messages d'echo
 log_and_display() {
     local message="$1"
+    echo "$message"
     echo "$message" | echo "$(date '+%Y-%m-%d %H:%M:%S') $message" | tee -a "$SUCCESS_LOG"; }
