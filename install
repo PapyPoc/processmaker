@@ -4,8 +4,10 @@
 # Author: PapyPoc
 # Version: 1.0.0
 # ProcessMaker BPM Core : https://github.com/tomolimo/processmaker-server/tree/main
-#
+# shellcheck disable=SC2034
 # shellcheck disable=SC1091
+#
+
 source ./processmaker/conf
 source ./processmaker/function
 clear
@@ -94,7 +96,7 @@ if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
 EOF
         systemctl enable --now dnf-automatic.timer
         log_and_display "Installation des extensions de php"
-        dnf install -y php-gd php-mysql php-xml php-soap php-mbstring php-ldap php-cli php-curl
+        dnf install -y php-gd php-xml php-soap php-mbstring php-ldap php-cli php-curl
         log_and_display "Installation des service lamp..."
         dnf install -y crontabs logrotate cronie tar perl curl jq
         sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
@@ -163,10 +165,9 @@ EOF
         systemctl restart mysqld
         sleep 1; 
         log_and_display "Téléchargement et installation de la version ${NEW_VERSION} de ProcessMaker..."
-        # Get download link for the latest release
-        DOWNLOADLINK=$(curl -s  https://api.github.com/repos/tomolimo/processmaker-server/releases/latest | jq -r '.assets[0].browser_download_url')
         wget -O /tmp/pm-latest.zip "$DOWNLOADLINK"
-        unzip /tmp/pm-latest.zip -d /opt/
+        mkdir "${REP_PM}"
+        tar --strip-components=1 -xzf  /tmp/pm-latest.zip -C "${REP_PM}"
         log_and_display "Configuration de ProcessMaker..."
         mkdir -p /var/log/processmaker
         chown -R nginx:nginx /var/log/processmaker
@@ -179,26 +180,59 @@ EOF
         cat > /etc/nginx/conf.d/pm.conf << EOF
 server {
     listen 80;
+    listen [::]:80;
     server_name processmaker.lan;
     root ${REP_PM}processmaker-server/workflow/public_html/;
-    index index.html;
+    index index.html index.htm app.php index.php;
+    try_files \$uri \$uri/ /index.php?\$args;
     charset utf-8;
     location / {
-        try_files \$uri/ /index.php?\$query_string;
+        try_files \$uri \$uri/ /index.php?\$query_string;
     }
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+    access_log /var/log/nginx/pm-access.log combined; #enables access logs
+    error_log  /var/log/nginx/pm-error.log error; #enables error logs
+    sendfile off;
+    client_max_body_size 100m;
+    # Every PHP script must be routed to PHP-FPM
     location ~ \.php$ {
-        include fastcgi_params;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
         fastcgi_pass unix:/var/run/php-fpm/www.sock;
-        fastcgi_index index.php;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi.conf;
+        fastcgi_index    app.php;
+        include fastcgi_params;
+        fastcgi_param    SCRIPT_FILENAME  /opt/processmaker-server/workflow/public_html/app.php;
+        fastcgi_intercept_errors off;
+        fastcgi_buffers 8 16k;
+        fastcgi_buffer_size 32k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
     }
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|woff|woff2|ttf|svg|eot|otf|webp)$ {
-        expires max;
+    #Browser Caching
+    location ~* \.(ico|css|js|gif|jpeg|jpg|png|woff|ttf|otf|svg|woff2|eot)$ {
+        expires 24h;
+        add_header Cache-Control public;
+        access_log off;
         log_not_found off;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+        fastcgi_index    app.php;
+        include fastcgi_params;
+        fastcgi_param    SCRIPT_FILENAME   /opt/processmaker-server/workflow/public_html/app.php;
+        fastcgi_intercept_errors off;
+        fastcgi_buffers 8 16k;
+        fastcgi_buffer_size 32k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
     }
     location ~ /\.ht {
         deny all;
+    }
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
     }
 }
 EOF
