@@ -5,9 +5,14 @@
 function compatible() {
     local version="$1"
     local -n versions_array="$2"
-    [[ ${versions_array[*]} =~ ${version} ]]; }
+    [[ ${versions_array[*]} =~ ${version} ]]
+}
 # Fonction pour gérer les messages d'echo
 log_and_display() {
     local message="$1"
+    local log_level="$2" # INFO ou ERREUR
+    local log_file="${3:-$SUCCESS_LOG}" # Par défaut, succès
+
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$log_level] $message" >> "$log_file"
     echo "$message"
-    echo "$message" | echo "$(date '+%Y-%m-%d %H:%M:%S') $message" | tee -a "$SUCCESS_LOG"; }
+}

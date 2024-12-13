@@ -7,15 +7,18 @@
 # shellcheck disable=SC2034
 # shellcheck disable=SC1091
 #
-
+clear
 source ./processmaker/conf
 source ./processmaker/function
-clear
 # Vérifier que les fichiers de log sont accessibles
-if ! touch "$SUCCESS_LOG" "$ERROR_LOG" 2>/dev/null; then
-    echo "Erreur : Impossible de créer ou écrire dans les fichiers de log" >&2
+log_and_display "Initialisation des logs..." "INFO"
+touch "$SUCCESS_LOG" "$ERROR_LOG" || {
+    echo "Erreur : Impossible de créer les fichiers de log." >&2
     exit 1
-fi
+}
+log_and_display "Fichiers de log :" "INFO"
+log_and_display "  - $SUCCESS_LOG" "INFO"
+log_and_display "  - $ERROR_LOG" "INFO"
 # Rediriger stdout des commandes (sauf echo) vers un fichier de log
 exec > >(while read -r line; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $line" >> "$SUCCESS_LOG"
@@ -163,7 +166,6 @@ EOF
         #echo "table_open_cache_instances = 4" >> /etc/my.cnf.d/pm.cnf
         # Restart MariaDB
         systemctl restart mysqld
-        sleep 1; 
         log_and_display "Téléchargement et installation de la version ${NEW_VERSION} de ProcessMaker..."
         wget -O /tmp/pm-latest.zip "$DOWNLOADLINK"
         mkdir "${REP_PM}"
@@ -172,68 +174,52 @@ EOF
         mkdir -p /var/log/processmaker
         chown -R nginx:nginx /var/log/processmaker
         chmod -R 777 /var/log/processmaker
-        sleep 1
         # Add permissions
-        chown -R nginx:nginx "${REP_PM}processmaker-server"
-        chmod -R 777 "${REP_PM}processmaker-server"
-        sleep 1
+        chown -R nginx:nginx "${REP_PM}"
+        chmod -R 777 "${REP_PM}"
         cat > /etc/nginx/conf.d/pm.conf << EOF
 server {
-    listen 80;
-    listen [::]:80;
-    server_name processmaker.lan;
-    root ${REP_PM}processmaker-server/workflow/public_html/;
-    index index.html index.htm app.php index.php;
-    try_files \$uri \$uri/ /index.php?\$args;
-    charset utf-8;
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
+    listen       8090;
+    server_name  pm.mydomain.com;
+    root         ${REP_PM}/workflow/public_html/;
+
+
+    # redirect server error pages to the static page /50x.html
+    #
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
     }
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-    access_log /var/log/nginx/pm-access.log combined; #enables access logs
-    error_log  /var/log/nginx/pm-error.log error; #enables error logs
-    sendfile off;
-    client_max_body_size 100m;
-    # Every PHP script must be routed to PHP-FPM
-    location ~ \.php$ {
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:/var/run/php-fpm/www.sock;
-        fastcgi_index    app.php;
-        include fastcgi_params;
-        fastcgi_param    SCRIPT_FILENAME  /opt/processmaker-server/workflow/public_html/app.php;
-        fastcgi_intercept_errors off;
-        fastcgi_buffers 8 16k;
-        fastcgi_buffer_size 32k;
-        fastcgi_connect_timeout 300;
-        fastcgi_send_timeout 300;
-        fastcgi_read_timeout 300;
-    }
-    #Browser Caching
-    location ~* \.(ico|css|js|gif|jpeg|jpg|png|woff|ttf|otf|svg|woff2|eot)$ {
-        expires 24h;
-        add_header Cache-Control public;
+
+    # Deny all attempts to access hidden files such as .htaccess, .htpasswd, .DS_Store (Mac).
+    location ~ /\. {
+        deny all;
         access_log off;
         log_not_found off;
-        fastcgi_pass unix:/var/run/php-fpm/www.sock;
-        fastcgi_index    app.php;
-        include fastcgi_params;
-        fastcgi_param    SCRIPT_FILENAME   /opt/processmaker-server/workflow/public_html/app.php;
-        fastcgi_intercept_errors off;
-        fastcgi_buffers 8 16k;
-        fastcgi_buffer_size 32k;
-        fastcgi_connect_timeout 300;
-        fastcgi_send_timeout 300;
-        fastcgi_read_timeout 300;
     }
-    location ~ /\.ht {
-        deny all;
-    }
-    error_page 404 /404.html;
-    error_page 500 502 503 504 /50x.html;
-    location = /50x.html {
-        root /usr/share/nginx/html;
-    }
+
+    rewrite ^/.*/(.*)$ /glpi/app.php last;
+
+    location ~ [^/]\.php(/|$) {
+            # regex to split $uri to $fastcgi_script_name and $fastcgi_path
+            fastcgi_split_path_info ^(.+\.php)(/.+)$;
+
+            # Check that the PHP script exists before passing it
+            try_files \$fastcgi_script_name =404;
+
+            fastcgi_pass unix:/var/run/php-fpm/www.sock;
+
+            include fastcgi.conf;
+
+            # Bypass the fact that try_files resets $fastcgi_path_info
+            # # see: http://trac.nginx.org/nginx/ticket/321
+            set \$path_info \$fastcgi_path_info;
+            fastcgi_param PATH_INFO \$path_info;
+
+            # allow directory index
+            fastcgi_index index.php;
+     }
+
 }
 EOF
         cat > /etc/logrotate.d/pm << EOF
