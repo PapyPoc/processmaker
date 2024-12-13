@@ -99,8 +99,32 @@ EOF
         # Configuration de MySQL
         log_and_display "Configuration de MySQL"
         mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLROOTPWD';" || { log_and_display "Erreur lors de la configuration de MySQL." ; exit 1; }
-        mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL." ; exit 1; }
-        mysql -u root -p"$SQLROOTPWD" -e "DELETE FROM user WHERE User='';" || { log_and_display "Erreur lors de la suppression des utilisateurs anonymes." ; exit 1; }
+        #mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL." ; exit 1; }
+        # Changing the root password
+        mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLROOTPWD';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Grant privileges to the root user for all database
+        mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Remove anonymous users
+        mysql -u root -p"$SQLROOTPWD" -e "DELETE FROM user WHERE User='';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Disallow root login remotely
+        mysql -u root -p"$SQLROOTPWD" -e "UPDATE mysql.user SET Host='localhost' WHERE User='root';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Remove test database and access to it
+        mysql -u root -p"$SQLROOTPWD" -e "DROP DATABASE test;" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Reload privilege tables now
+        mysql -u root -p"$SQLROOTPWD" -e "FLUSH PRIVILEGES;" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Create a new database
+        mysql -u root -p"$SQLROOTPWD" -e "CREATE DATABASE processmaker;" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Create a new user
+        mysql -u root -p"$SQLROOTPWD" -e "CREATE USER 'pm_user'@'localhost' IDENTIFIED BY '$SQLPMPWD';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Grant privileges to the new user for the new database
+        mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON processmaker.* TO 'pm_user'@'localhost';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Reload privileges
+        mysql -u root -p"$SQLROOTPWD" -e "FLUSH PRIVILEGES;" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Grant privileges to the pm_user for database mysql.time_zone_name
+        mysql -u root -p"$SQLROOTPWD" -e "GRANT SELECT ON mysql.time_zone_name TO 'pm_user'@'localhost'" || { log_and_display "Erreur lors de la gestion des privilèges MySQL.";}
+        # Initialize time zones datas
+        log_and_display "Configuration de TimeZone"
+        mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p"$SQLROOTPWD" mysql
         # Téléchargement et installation de ProcessMaker
         log_and_display "Téléchargement et installation de ProcessMaker..."
         wget -O /tmp/pm-latest.zip "$DOWNLOADLINK" || { log_and_display "Erreur lors du téléchargement de ProcessMaker." ; exit 1; }
