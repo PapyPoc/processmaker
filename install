@@ -55,16 +55,16 @@ if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
     else
         log_and_display "Nouvelle installation : ProcessMaker version $NEW_VERSION"
         log_and_display "Recherche des mises à jour..."
-        dnf update -y || { log_and_display "Erreur lors de la mise à jour." ; exit 1; }
+        dnf update -yq || { log_and_display "Erreur lors de la mise à jour." ; exit 1; }
         log_and_display "Application des mises à jour"
-        dnf upgrade -y || { log_and_display "Erreur lors de l'upgrade." ; exit 1; }
+        dnf upgrade -yq || { log_and_display "Erreur lors de l'upgrade." ; exit 1; }
         sleep 1
-        dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || { log_and_display "Erreur lors de l'installation d'epel-release." ; exit 1; }        
-        dnf module reset -y php nginx nodejs php || { log_and_display "Erreur lors de la réinitialisation des modules." ; exit 1; }
-        dnf module switch-to -y nginx:1.24 nodejs:22 php:8.2 || { log_and_display "Erreur lors de la mise à jour des modules." ; exit 1; }
-        dnf install -y mysql-server phpmyadmin || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
+        dnf install -yq https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || { log_and_display "Erreur lors de l'installation d'epel-release." ; exit 1; }        
+        dnf module reset -yq php nginx nodejs php || { log_and_display "Erreur lors de la réinitialisation des modules." ; exit 1; }
+        dnf module switch-to -yq nginx:1.24 nodejs:22 php:8.2 || { log_and_display "Erreur lors de la mise à jour des modules." ; exit 1; }
+        dnf install -yq mysql-server phpmyadmin || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
         log_and_display "Activation des mises à jour automatiques"
-        dnf install dnf-automatic -y || { log_and_display "Erreur lors de l'installation de dnf-automatic." ; exit 1; }
+        dnf install dnf-automatic -yq || { log_and_display "Erreur lors de l'installation de dnf-automatic." ; exit 1; }
         # Configuration des mises à jour automatiques
         sed -i 's/^\(;\?\)\(apply_updates =\).*/\2 yes/' /etc/dnf/automatic.conf
         sed -i 's/^\(;\?\)\(reboot =\).*/\2 when-needed/' /etc/dnf/automatic.conf
@@ -86,9 +86,9 @@ EOF
 
         # Installation des extensions PHP
         log_and_display "Installation des extensions PHP"
-        dnf install -y php-gd php-xml php-soap php-mbstring php-ldap php-cli php-curl || { log_and_display "Erreur lors de l'installation des extensions PHP." ; exit 1; }
+        dnf install -yq php-gd php-xml php-soap php-mbstring php-ldap php-cli php-curl || { log_and_display "Erreur lors de l'installation des extensions PHP." ; exit 1; }
         log_and_display "Installation des services LEMP..."
-        dnf install -y crontabs nginx logrotate cronie tar perl curl jq || { log_and_display "Erreur lors de l'installation des services LAMP." ; exit 1; }
+        dnf install -yq crontabs nginx logrotate cronie tar perl curl jq || { log_and_display "Erreur lors de l'installation des services LAMP." ; exit 1; }
         sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
         sed -i 's/^\(;\?\)\(group =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
         # Activation et démarrage des services nécessaires
