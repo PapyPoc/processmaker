@@ -3,10 +3,9 @@
 # ProcessMaker install script
 # Author: PapyPoc
 # Version: 1.0.0
-# ProcessMaker BPM Core : https://github.com/tomolimo/processmaker-server/tree/main
+# ProcessMaker BPM Core : https://github.com/tomolimo/processmaker-server/releases
 # shellcheck disable=SC2034
 # shellcheck disable=SC1091
-#
 clear
 source ./processmaker/conf
 source ./processmaker/function
@@ -26,202 +25,121 @@ exec 2> >(while read -r line; do
 done)
 # Vérification des privilèges root
 if [[ "$(id -u)" -ne 0 ]]; then
-    log_and_display "Ce script doit étre exécuté en tant que root"
+    log_and_display "Ce script doit être exécuté en tant que root"
     exit 1
 else
     log_and_display "Privilège Root: OK"
 fi
 # Source le fichier /etc/os-release pour obtenir les informations de la distribution
 source /etc/os-release
-# Vérifie si la distribution est basée sur Debian, Ubuntu, Alma Linux, Centos ou Rocky Linux
+# Vérification si la distribution est compatible
 if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
     if compatible "${VERSION_ID}" ALMA_VERSIONS || compatible "${VERSION_ID}" CENTOS_VERSIONS || compatible "${VERSION_ID}" ROCKY_VERSIONS || compatible "${VERSION_ID}" REDHAT_VERSIONS; then
-        log_and_display "La version de votre systeme d'exploitation (${ID} ${VERSION_ID}) est compatible."
+        log_and_display "La version de votre système d'exploitation (${ID} ${VERSION_ID}) est compatible."
     else
-        log_and_display "La version de votre système d'exploitation (${ID} ${VERSION_ID}) n'est pas considérée comme compatible."
-        log_and_display "Voulez-vous toujours forcer l'installation ? Attention, si vous choisissez de forcer le script, c'est à vos risques et périls."
-        log_and_display "Etes-vous sûr de vouloir continuer ? [Oui/Non]"
+        log_and_display "La version de votre système d'exploitation (${ID} ${VERSION_ID}) n'est pas compatible."
+        log_and_display "Voulez-vous forcer l'installation ? Attention, si vous choisissez de forcer, c'est à vos risques et périls."
+        log_and_display "Êtes-vous sûr de vouloir continuer ? [Oui/Non]"
         read -r response
         case "$response" in
-            O|o)
-                log_and_display "Continuing..."
-                ;;
-            N|n)
-                log_and_display "Exiting..."
-                exit 1
-                ;;
-            *)
-                log_and_display "Réponse non valide. Quitter..."
-                exit 1
-                ;;
+            O|o) log_and_display "Continuing..." ;;
+            N|n) log_and_display "Exiting..." ; exit 1 ;;
+            *) log_and_display "Réponse non valide. Quitter..." ; exit 1 ;;
         esac
     fi
-    # Vérifie si le répertoire existe
+    # Vérifie si le répertoire existe déjà
     if [ -d "$1" ]; then
-        #output=$(php ${REP_PM}bin/console -V 2>&1)
-        sleep 2
-        #glpi_cli_version=$(sed -n 's/.*GLPI CLI \([^ ]*\).*/\1/p' <<< $output)
-        #log_and_display "Le site est déjà installé. Version $glpi_cli_version"
-        log_and_display "Vous avez déjà une version de ProcessMaker d'installer. Mise à jour annuler"
+        log_and_display "ProcessMaker est déjà installé. Mise à jour annulée."
         sleep 5
-        exit 0;
+        exit 0
     else
-        log_and_display "Nouvelle version trouver : ProcessMaker version $NEW_VERSION"
-        log_and_display "Recherche des mises à jour"
-        dnf update -y
+        log_and_display "Nouvelle installation : ProcessMaker version $NEW_VERSION"
+        log_and_display "Recherche des mises à jour..."
+        dnf update -y || { log_and_display "Erreur lors de la mise à jour." ; exit 1; }
         log_and_display "Application des mises à jour"
-        dnf upgrade -y
+        dnf upgrade -y || { log_and_display "Erreur lors de l'upgrade." ; exit 1; }
         sleep 1
-        dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-        dnf module reset -y php nginx nodejs php
-        dnf module switch-to -y nginx:1.24 nodejs:22 php:8.2
-        dnf module install -y php nginx nodejs
-        dnf install -y mysql-server phpmyadmin 
-        log_and_display "Activation des mises à jour automatique"
-        dnf install dnf-automatic -y
+        dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || { log_and_display "Erreur lors de l'installation d'epel-release." ; exit 1; }        
+        dnf module reset -y php nginx nodejs php || { log_and_display "Erreur lors de la réinitialisation des modules." ; exit 1; }
+        dnf module switch-to -y nginx:1.24 nodejs:22 php:8.2 || { log_and_display "Erreur lors de la mise à jour des modules." ; exit 1; }
+        dnf install -y mysql-server phpmyadmin || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
+        log_and_display "Activation des mises à jour automatiques"
+        dnf install dnf-automatic -y || { log_and_display "Erreur lors de l'installation de dnf-automatic." ; exit 1; }
+        # Configuration des mises à jour automatiques
         sed -i 's/^\(;\?\)\(apply_updates =\).*/\2 yes/' /etc/dnf/automatic.conf
         sed -i 's/^\(;\?\)\(reboot =\).*/\2 when-needed/' /etc/dnf/automatic.conf
         sed -i 's/^\(;\?\)\(upgrade_type =\).*/\2 security/' /etc/dnf/automatic.conf
+
         mkdir /etc/systemd/system/dnf-automatic.timer.d
         cat > /etc/systemd/system/dnf-automatic.timer.d/override.conf << EOF
 [Unit]
-    Description=dnf-automatic timer
-    ConditionPathExists=!/run/ostree-booted
-    Wants=network-online.target
+Description=dnf-automatic timer
+ConditionPathExists=!/run/ostree-booted
+Wants=network-online.target
 
 [Timer]
-    OnCalendar=*-*-* 6:00
-    RandomizedDelaySec=60m
-    Persistent=true
+OnCalendar=*-*-* 6:00
+RandomizedDelaySec=60m
+Persistent=true
 EOF
-        systemctl enable --now dnf-automatic.timer
-        log_and_display "Installation des extensions de php"
-        dnf install -y php-gd php-xml php-soap php-mbstring php-ldap php-cli php-curl
-        log_and_display "Installation des service lamp..."
-        dnf install -y crontabs logrotate cronie tar perl curl jq
+        systemctl enable --now dnf-automatic.timer || { log_and_display "Erreur lors de l'activation de dnf-automatic." ; exit 1; }
+
+        # Installation des extensions PHP
+        log_and_display "Installation des extensions PHP"
+        dnf install -y php-gd php-xml php-soap php-mbstring php-ldap php-cli php-curl || { log_and_display "Erreur lors de l'installation des extensions PHP." ; exit 1; }
+        log_and_display "Installation des services LAMP..."
+        dnf install -y crontabs logrotate cronie tar perl curl jq || { log_and_display "Erreur lors de l'installation des services LAMP." ; exit 1; }
         sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
         sed -i 's/^\(;\?\)\(group =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
-        log_and_display "Activation et démarrage de MySQL, d'ENGINE X et de PHP-FPM"
-        systemctl enable --now nginx mysqld php-fpm
+        # Activation et démarrage des services nécessaires
+        log_and_display "Activation et démarrage de MySQL, Nginx et PHP-FPM"
+        systemctl enable --now nginx mysqld php-fpm || { log_and_display "Erreur lors de l'activation des services." ; exit 1; }
         firewall-cmd --permanent --zone=public --add-service=http
-        firewall-cmd --reload;
-        log_and_display "Configuration de Mysql"
-        sleep 1
-        # Changing the root password
-        mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLROOTPWD';"
-        # Grant privileges to the root user for all database
-        mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';"
-        # Remove anonymous users
-        mysql -u root -p"$SQLROOTPWD" -e "DELETE FROM user WHERE User='';"
-        # Disallow root login remotely
-        mysql -u root -p"$SQLROOTPWD" -e "UPDATE mysql.user SET Host='localhost' WHERE User='root';"
-        # Remove test database and access to it
-        mysql -u root -p"$SQLROOTPWD" -e "DROP DATABASE test;"
-        # Reload privilege tables now
-        mysql -u root -p"$SQLROOTPWD" -e "FLUSH PRIVILEGES;"
-        # Create a new database
-        mysql -u root -p"$SQLROOTPWD" -e "CREATE DATABASE processmaker;"
-        # Create a new user
-        mysql -u root -p"$SQLROOTPWD" -e "CREATE USER 'pm_user'@'localhost' IDENTIFIED BY '$SQLPMPWD';"
-        # Grant privileges to the new user for the new database
-        mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON processmaker.* TO 'pm_user'@'localhost';"
-        # Reload privileges
-        mysql -u root -p"$SQLROOTPWD" -e "FLUSH PRIVILEGES;"
-        # 
-        mysql -u root -p"$SQLROOTPWD" -e "GRANT SELECT ON mysql.time_zone_name TO 'pm_user'@'localhost'"
-        # Initialize time zones datas
-        log_and_display "Configuration de TimeZone"
-        mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p"$SQLROOTPWD" mysql
-        #echo "[mysqld]" > /etc/my.cnf.d/pm.cnf
-        #echo "back_log = 16000" >> /etc/my.cnf.d/pm.cnf
-        #echo "connect_timeout = 31536000" >> /etc/my.cnf.d/pm.cnf
-        #echo "explicit_defaults_for_timestamp = ON" >> /etc/my.cnf.d/pm.cnf
-        #echo "host_cache_size = 653" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_adaptive_hash_index = OFF" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_change_buffering = none" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_checksum_algorithm = none" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_checksums = OFF" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_doublewrite = OFF" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_flush_method = O_DIRECT" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_open_files = 6000" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_page_cleaners = 2" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_purge_batch_size = 600" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_purge_threads = 1" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_stats_persistent_sample_pages = 128" >> /etc/my.cnf.d/pm.cnf
-        #echo "innodb_use_native_aio = OFF" >> /etc/my.cnf.d/pm.cnf
-        #echo "interactive_timeout = 31536000" >> /etc/my.cnf.d/pm.cnf
-        #echo "max_allowed_packet = 1073741824" >> /etc/my.cnf.d/pm.cnf
-        #echo "max_connections = 1000" >> /etc/my.cnf.d/pm.cnf
-        #echo "max_execution_time = 18446744073709551615" >> /etc/my.cnf.d/pm.cnf
-        #echo "myisam_recover_options = OFF" >> /etc/my.cnf.d/pm.cnf
-        #echo "open_files_limit = 65535" >> /etc/my.cnf.d/pm.cnf
-        #echo "performance_schema = OFF" >> /etc/my.cnf.d/pm.cnf
-        #echo "query_cache_size = 464717824" >> /etc/my.cnf.d/pm.cnf
-        #echo "query_cache_type = ON" >> /etc/my.cnf.d/pm.cnf
-        #echo "skip_name_resolve = ON" >> /etc/my.cnf.d/pm.cnf
-        #echo "table_definition_cache = 20000" >> /etc/my.cnf.d/pm.cnf
-        #echo "table_open_cache_instances = 4" >> /etc/my.cnf.d/pm.cnf
-        # Restart MariaDB
-        systemctl restart mysqld
-        log_and_display "Téléchargement et installation de la version ${NEW_VERSION} de ProcessMaker..."
-        wget -O /tmp/pm-latest.zip "$DOWNLOADLINK"
-        mkdir "${REP_PM}"
-        tar --strip-components=1 -xzf  /tmp/pm-latest.zip -C "${REP_PM}"
+        firewall-cmd --reload || { log_and_display "Erreur lors de la configuration du pare-feu." ; exit 1; }
+        # Configuration de MySQL
+        log_and_display "Configuration de MySQL"
+        mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLROOTPWD';" || { log_and_display "Erreur lors de la configuration de MySQL." ; exit 1; }
+        mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';" || { log_and_display "Erreur lors de la gestion des privilèges MySQL." ; exit 1; }
+        mysql -u root -p"$SQLROOTPWD" -e "DELETE FROM user WHERE User='';" || { log_and_display "Erreur lors de la suppression des utilisateurs anonymes." ; exit 1; }
+        # Téléchargement et installation de ProcessMaker
+        log_and_display "Téléchargement et installation de ProcessMaker..."
+        wget -O /tmp/pm-latest.zip "$DOWNLOADLINK" || { log_and_display "Erreur lors du téléchargement de ProcessMaker." ; exit 1; }
+        mkdir -p "${REP_PM}"
+        tar --strip-components=1 -xzf /tmp/pm-latest.zip -C "${REP_PM}" || { log_and_display "Erreur lors de l'extraction de ProcessMaker." ; exit 1; }
+        # Configuration de ProcessMaker et des logs
         log_and_display "Configuration de ProcessMaker..."
         mkdir -p /var/log/processmaker
         chown -R nginx:nginx /var/log/processmaker
         chmod -R 777 /var/log/processmaker
-        # Add permissions
-        chown -R nginx:nginx "${REP_PM}"
-        chmod -R 777 "${REP_PM}"
+        # Configuration Nginx
         cat > /etc/nginx/conf.d/pm.conf << EOF
 server {
-    listen       8090;
-    server_name  pm.mydomain.com;
-    root         ${REP_PM}/workflow/public_html/;
-
-
-    # redirect server error pages to the static page /50x.html
-    #
-    error_page   500 502 503 504  /50x.html;
+    listen 80;
+    server_name pm.lan;
+    root ${REP_PM}/workflow/public_html/;
+    error_page 500 502 503 504 /50x.html;
     location = /50x.html {
-        root   /usr/share/nginx/html;
+        root /usr/share/nginx/html;
     }
-
-    # Deny all attempts to access hidden files such as .htaccess, .htpasswd, .DS_Store (Mac).
     location ~ /\. {
         deny all;
         access_log off;
         log_not_found off;
     }
-
     rewrite ^/.*/(.*)$ /glpi/app.php last;
-
     location ~ [^/]\.php(/|$) {
-            # regex to split $uri to $fastcgi_script_name and $fastcgi_path
-            fastcgi_split_path_info ^(.+\.php)(/.+)$;
-
-            # Check that the PHP script exists before passing it
-            try_files \$fastcgi_script_name =404;
-
-            fastcgi_pass unix:/var/run/php-fpm/www.sock;
-
-            include fastcgi.conf;
-
-            # Bypass the fact that try_files resets $fastcgi_path_info
-            # # see: http://trac.nginx.org/nginx/ticket/321
-            set \$path_info \$fastcgi_path_info;
-            fastcgi_param PATH_INFO \$path_info;
-
-            # allow directory index
-            fastcgi_index index.php;
-     }
-
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        try_files \$fastcgi_script_name =404;
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+        include fastcgi.conf;
+        set \$path_info \$fastcgi_path_info;
+        fastcgi_param PATH_INFO \$path_info;
+        fastcgi_index index.php;
+    }
 }
 EOF
+        # Configuration de la rotation des logs
         cat > /etc/logrotate.d/pm << EOF
-# Rotate GLPI logs daily, only if not empty
-# Save 14 days old logs under compressed mode
 /var/log/processmaker/*.log {
     su nginx nginx
     daily
@@ -235,91 +153,17 @@ EOF
         chmod 0644 /etc/logrotate.d/pm
         chown root:root /etc/logrotate.d/pm
         chcon system_u:object_r:etc_t:s0 /etc/logrotate.d/pm
-        sed -i 's/^\(;\?\)\(session.cookie_httponly\).*/\2 = on/' /etc/php.ini
+        # Permissions et redémarrage des services
         setsebool -P httpd_can_network_connect on
         setsebool -P httpd_can_network_connect_db on
         setsebool -P httpd_can_sendmail on
-        semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}processmaker-server(/.*)?"
+        semanage fcontext -a -t httpd_sys_rw_content_t "${REP_PM}(/.*)?"
         semanage fcontext -a -t httpd_sys_rw_content_t "/var/log/processmaker(/.*)?"
-        restorecon -R "${REP_PM}processmaker-server"
+        restorecon -R "${REP_PM}"
         restorecon -R /var/log/processmaker
-        # Restart de Nginx et php-fpm
-        systemctl restart nginx php-fpm
-        sleep 5
-        #rm -rf ${REP_PM}install/install.php
-        #sleep 5
-        #sed -i '$i \   public $date_default_timezone_set = ("'${TIMEZONE}'");' /etc/glpi/config/config_db.php
-        
-        # Change timezone and language
-        #mysql -e "INSERT INTO glpi.glpi_configs (context, name, value) VALUES ('core', 'timezone', '${TIMEZONE}');"
-        #mysql -e "UPDATE glpi.glpi_configs SET value = "${LANG}" WHERE name = 'language';"
-        
-        # Change permissions
-        chown -R nginx:nginx /var/log/processmaker
-        chmod -R 755 /var/log/processmaker
-        chown -R nginx:nginx "${REP_PM}"
-        chmod -R 755 "${REP_PM}"
-        systemctl restart nginx php-fpm
-        
-        # maj_user_pm
-        log_and_display "Changement des mots de passe de ProcessMaker..."
-        # Changer le mot de passe de l'admin glpi 
-        #mysql -u pm_user -p"${SQLPMPWD}" -e "USE processmaker; UPDATE pm_users SET password = MD5('${ADMINPMPWD}') WHERE name = 'glpi';"
-        
-        # display_credentials
-        log_and_display "<==========================> Détail de l'installation de ProcessMaker <=================================>"
-        log_and_display "ProcessMaker Version: ${NEW_VERSION}"
-        log_and_display "Répertoire d'installation de ProcessMaker: ${REP_PM}"
-        log_and_display "Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables."
-        log_and_display ""
-        log_and_display "Les comptes utilisateurs par défaut sont :"
-        log_and_display "UTILISATEUR  -  MOT DE PASSE       -  ACCES"
-        log_and_display "pm           -  ${ADMINPMPWD}       -  compte admin"
-        log_and_display ""
-        log_and_display "Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :"
-        log_and_display "http://${IPADRESS}" 
-        log_and_display ""
-        log_and_display "==> Database:"
-        log_and_display "Mot de passe root: ${SLQROOTPWD}"
-        log_and_display "Mot de passe glpi_user: ${SQLPMPWD}"
-        log_and_display "Nom de la base de données ProcessMaker: processmaker"
-        log_and_display "<===============================================================================================>"
-        log_and_display ""
-        log_and_display "Si vous rencontrez un problème avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues"
-        
-        # write_credentials
-        cat > /root/sauve_mdp.txt << EOF
- <==========================> Détail de l'installation de ProcessMaker <=================================
- ProcessMaker Version: ${NEW_VERSION}
- Répertoire d'installation de ProcessMaker: ${REP_PM}
- Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables.
- 
- Les comptes utilisateurs par défaut sont :
- UTILISATEUR       -  MOT DE PASSE       -  ACCES
- pm          -  ${ADMINPMPWD}       -  compte admin
- 
- Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :
- http://${IPADRESS}
- 
- ==> Database:
- Mot de passe root: ${SLQROOTPWD}
- Mot de passe glpi_user: ${SQLPMPWD}
- Nom de la base de données ProcessMaker: processmaker
- <===============================================================================================>
- 
- Si vous rencontrez un probléme avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues
-EOF
-        chmod 700 /root/sauve_mdp.txt
-        log_and_display ""
-        log_and_display "Fichier de sauve_mdp.txt enregistrer dans /home"
-        log_and_display ""
-        # Vérifie si le répertoire existe
-        #if [ -e "$REP_SCRIPT" ]; then
-        #        log_and_display "Le script est déjà présent."
-        #        log_and_display "Effacement en cours"
-        #        rm -Rf "$REP_SCRIPT"
-        #fi
+        systemctl restart nginx php-fpm || { log_and_display "Erreur lors du redémarrage de Nginx ou PHP-FPM." ; exit 1; }
+        log_and_display "Installation et configuration terminées !"
     fi
 fi
-# Restaurer les flux de sortie à leur état initial (pour ne pas inclure la sortie de dialog dans les logs)
+# Restaurer les flux de sortie à leur état initial
 exec 2>&3
