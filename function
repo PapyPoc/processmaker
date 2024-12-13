@@ -10,9 +10,8 @@ function compatible() {
 # Fonction pour gérer les messages d'echo
 log_and_display() {
     local message="$1"
-    local log_level="$2" # INFO ou ERREUR
-    local log_file="$3" # Par défaut, succès
+    local log_file="$2" # Par défaut, succès
 
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [$log_level] $message" >> "$log_file"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$log_level] $message" >> "$ERROR_LOG"
     echo "$message"
 }

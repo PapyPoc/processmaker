@@ -18,5 +18,4 @@ TIMEZONE=$(timedatectl | grep "Time zone" | awk '{print $3}') # Récupere le Tim
 LANG=$(locale | grep LANG | cut -d= -f2 | cut -d. -f1) # Récupere la langue du systéme
 INTERFACE=$(ip route | awk 'NR==1 {print $5}') # Récupere l'interface réseau du systéme
 IPADRESS=$(ip addr show "$INTERFACE" | grep inet | awk '{ print $2; }' | sed 's/\/.*$//' | head -n 1) # Récupere l'adresse IP du systéme
-SUCCESS_LOG="/root/success.log" # Fichiers pour les logs success
 ERROR_LOG="/root/error.log" # Fichiers pour les logs error
