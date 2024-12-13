@@ -11,18 +11,15 @@ clear
 source ./processmaker/conf
 source ./processmaker/function
 # Vérifier que les fichiers de log sont accessibles
-log_and_display "Initialisation des logs..." "INFO"
-touch "$SUCCESS_LOG" "$ERROR_LOG" || {
+log_and_display "Initialisation des logs..."
+touch "$ERROR_LOG" || {
     echo "Erreur : Impossible de créer les fichiers de log." >&2
     exit 1
 }
-log_and_display "Fichiers de log :" "INFO"
-log_and_display "  - $SUCCESS_LOG" "INFO"
-log_and_display "  - $ERROR_LOG" "INFO"
-# Rediriger stdout des commandes (sauf echo) vers un fichier de log
-exec > >(while read -r line; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $line" >> "$SUCCESS_LOG"
-done)
+log_and_display "Fichiers de log :"
+log_and_display "  - $ERROR_LOG"
+# Ouvrir le descripteur de fichier temporaire pour stderr
+exec 3>&2
 # Rediriger stderr vers un fichier de log
 exec 2> >(while read -r line; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') [ERREUR] $line" >> "$ERROR_LOG"
@@ -324,3 +321,5 @@ EOF
         #fi
     fi
 fi
+# Restaurer les flux de sortie à leur état initial (pour ne pas inclure la sortie de dialog dans les logs)
+exec 2>&3
