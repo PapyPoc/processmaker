@@ -15,11 +15,6 @@ Process Maker is installed by running the following command in your terminal.
 >
 >⚠️ Make sure the script is no longer present in the ``/root`` directory.
 >
->⚠️ 'Wget' must be installed on your system.
->```bash
->dnf install wget -y
->```
->
 >⚠️ Git must be installed on your system.
 >```bash
 >dnf install -y git
