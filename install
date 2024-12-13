@@ -105,11 +105,9 @@ EOF
         # Grant privileges to the root user for all database
         mysql -u root -p"$SQLROOTPWD" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost';" || log_and_display "Erreur lors de 'Grant privileges to the root user for all database'";
         # Remove anonymous users
-        mysql -u root -p"$SQLROOTPWD" -e "DELETE FROM user WHERE User='';" || log_and_display "Erreur lors de 'Remove anonymous users'";
+        mysql -u root -p"$SQLROOTPWD" -e "DELETE FROM mysql.user WHERE User='';" || log_and_display "Erreur lors de 'Remove anonymous users'";
         # Disallow root login remotely
         mysql -u root -p"$SQLROOTPWD" -e "UPDATE mysql.user SET Host='localhost' WHERE User='root';" || log_and_display "Erreur lors de 'Disallow root login remotely'";
-        # Remove test database and access to it
-        mysql -u root -p"$SQLROOTPWD" -e "DROP DATABASE test;" || log_and_display "Erreur lors de 'Remove test database and access to it'";
         # Reload privilege tables now
         mysql -u root -p"$SQLROOTPWD" -e "FLUSH PRIVILEGES;" || log_and_display "Erreur lors de 'Reload privilege tables now'";
         # Create a new database
@@ -255,11 +253,11 @@ EOF
         log_and_display "Fichier de sauve_mdp.txt enregistrer dans /home"
         log_and_display ""
         # Vérifie si le répertoire existe
-        #if [ -e "$REP_SCRIPT" ]; then
-        #        log_and_display "Le script est déjà présent."
-        #        log_and_display "Effacement en cours"
-        #        rm -Rf "$REP_SCRIPT"
-        #fi
+        if [ -e "$REP_SCRIPT" ]; then
+                log_and_display "Le script est déjà présent."
+                log_and_display "Effacement en cours"
+                rm -Rf "$REP_SCRIPT"
+        fi
     fi
 fi
 # Restaurer les flux de sortie à leur état initial

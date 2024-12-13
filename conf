@@ -7,12 +7,12 @@ ALMA_VERSIONS=("9.5") # Constante pour les versions d'Almalinux acceptables
 CENTOS_VERSIONS=("9") # Constante pour les versions de Centos acceptables
 ROCKY_VERSIONS=("9.5") # Constante pour les versions de Rocky Linux acceptables
 REDHAT_VERSIONS=("9.5") # Constante pour les versions de Red Hat acceptables
-REP_SCRIPT="/root/processmaker/" # Constante pour le script d'installation de PS
-REP_PM="/opt/processmaker" # Constante pour le répertoire d'installation du site Web PS
+REP_SCRIPT="/root/processmaker/" # Constante pour le script d'installation de PM
+REP_PM="/opt/processmaker" # Constante pour le répertoire d'installation du site Web PM
 SQLROOTPWD=$(openssl rand -base64 48 | cut -c1-18) # Constante pour le MdP root de MariaDB
-SQLPMPWD=$(openssl rand -base64 48 | cut -c1-18) # Constante pour le MdP PS de MariaDB
-ADMINPMPWD=$(openssl rand -base64 48 | cut -c1-12) # Constante pour pour le MdP du compte PS de PS
-NEW_VERSION=$(curl -s https://api.github.com/repos/tomolimo/processmaker-server/releases/latest | jq -r '.name') # Constante pour la dernière version de PS
+SQLPMPWD=$(openssl rand -base64 48 | cut -c1-18) # Constante pour le MdP PM de MariaDB
+ADMINPMPWD=$(openssl rand -base64 48 | cut -c1-12) # Constante pour pour le MdP du compte PM de PM
+NEW_VERSION=$(curl -s https://api.github.com/repos/tomolimo/processmaker-server/releases/latest | jq -r '.name') # Constante pour la dernière version de PM
 DOWNLOADLINK=$(curl -s  https://api.github.com/repos/tomolimo/processmaker-server/releases/latest | jq -r '.zipball_url') # Lien de téléchargement de la dernière version
 TIMEZONE=$(timedatectl | grep "Time zone" | awk '{print $3}') # Récupere le TimeZone du systéme
 LANG=$(locale | grep LANG | cut -d= -f2 | cut -d. -f1) # Récupere la langue du systéme
