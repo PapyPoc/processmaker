@@ -9,6 +9,13 @@
 clear
 source ./processmaker/conf
 source ./processmaker/function
+# Vérification des privilèges root
+if [[ "$(id -u)" -ne 0 ]]; then
+    log_and_display "Ce script doit être exécuté en tant que root"
+    exit 1
+else
+    log_and_display "Privilège Root: OK"
+fi
 # Vérifier que les fichiers de log sont accessibles
 log_and_display "Initialisation des logs..."
 touch "$ERROR_LOG" || {
@@ -23,13 +30,6 @@ exec 3>&2
 exec 2> >(while read -r line; do
     echo "$(date '+%Y-%m-%d %H:%M:%S') [ERREUR] $line" >> "$ERROR_LOG"
 done)
-# Vérification des privilèges root
-if [[ "$(id -u)" -ne 0 ]]; then
-    log_and_display "Ce script doit être exécuté en tant que root"
-    exit 1
-else
-    log_and_display "Privilège Root: OK"
-fi
 # Source le fichier /etc/os-release pour obtenir les informations de la distribution
 source /etc/os-release
 # Vérification si la distribution est compatible
@@ -61,7 +61,7 @@ if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
         sleep 1
         dnf install -yq https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || { log_and_display "Erreur lors de l'installation d'epel-release." ; exit 1; }        
         dnf module reset -yq php nginx nodejs php || { log_and_display "Erreur lors de la réinitialisation des modules." ; exit 1; }
-        dnf module switch-to -yq nginx:1.24 nodejs:22 php:8.2 || { log_and_display "Erreur lors de la mise à jour des modules." ; exit 1; }
+        dnf module switch-to -y wget nginx:1.24 nodejs:22 php:8.2 || { log_and_display "Erreur lors de la mise à jour des modules." ; exit 1; }
         dnf install -yq mysql-server phpmyadmin || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
         log_and_display "Activation des mises à jour automatiques"
         dnf install dnf-automatic -yq || { log_and_display "Erreur lors de l'installation de dnf-automatic." ; exit 1; }
@@ -219,8 +219,8 @@ EOF
         log_and_display "http://${IPADRESS}" 
         log_and_display ""
         log_and_display "==> Database:"
-        log_and_display "Mot de passe root: ${SLQROOTPWD}"
-        log_and_display "Mot de passe glpi_user: ${SQLPMPWD}"
+        log_and_display "Mot de passe root: ${SQLROOTPWD}"
+        log_and_display "Mot de passe pm_user: ${SQLPMPWD}"
         log_and_display "Nom de la base de données ProcessMaker: processmaker"
         log_and_display "<===============================================================================================>"
         log_and_display ""
@@ -241,8 +241,8 @@ EOF
  http://${IPADRESS}
  
  ==> Database:
- Mot de passe root: ${SLQROOTPWD}
- Mot de passe glpi_user: ${SQLPMPWD}
+ Mot de passe root: ${SQLROOTPWD}
+ Mot de passe pm_user: ${SQLPMPWD}
  Nom de la base de données ProcessMaker: processmaker
  <===============================================================================================>
  
