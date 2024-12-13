@@ -49,7 +49,7 @@ if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
     fi
     # Vérifie si le répertoire existe déjà
     if [ -d "$1" ]; then
-        log_and_display "ProcessMaker est déjà installé. Mise à jour annulée."
+        log_and_display "ProcessMaker est déjà installé. Installation annulée."
         sleep 5
         exit 0
     else
@@ -138,28 +138,46 @@ EOF
         # Configuration Nginx
         cat > /etc/nginx/conf.d/pm.conf << EOF
 server {
-    listen 80;
-    server_name pm.lan;
-    root ${REP_PM}/workflow/public_html/;
-    error_page 500 502 503 504 /50x.html;
+    listen       80;
+    server_name  pm.lan;
+    root         ${REP_PM}/workflow/public_html;
+
+
+    # redirect server error pages to the static page /50x.html
+    #
+    error_page   500 502 503 504  /50x.html;
     location = /50x.html {
-        root /usr/share/nginx/html;
+        root   /usr/share/nginx/html;
     }
+
+    # Deny all attempts to access hidden files such as .htaccess, .htpasswd, .DS_Store (Mac).
     location ~ /\. {
         deny all;
         access_log off;
         log_not_found off;
     }
+
     rewrite ^/.*/(.*)$ /glpi/app.php last;
+
     location ~ [^/]\.php(/|$) {
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        try_files \$fastcgi_script_name =404;
-        fastcgi_pass unix:/var/run/php-fpm/www.sock;
-        include fastcgi.conf;
-        set \$path_info \$fastcgi_path_info;
-        fastcgi_param PATH_INFO \$path_info;
-        fastcgi_index index.php;
-    }
+            # regex to split \$uri to \$fastcgi_script_name and \$fastcgi_path
+            fastcgi_split_path_info ^(.+\.php)(/.+)$;
+
+            # Check that the PHP script exists before passing it
+            try_files \$fastcgi_script_name =404;
+
+            fastcgi_pass unix:/var/run/php-fpm/www.sock;
+
+            include fastcgi.conf;
+
+            # Bypass the fact that try_files resets \$fastcgi_path_info
+            # # see: http://trac.nginx.org/nginx/ticket/321
+            set \$path_info \$fastcgi_path_info;
+            fastcgi_param PATH_INFO \$path_info;
+
+            # allow directory index
+            fastcgi_index index.php;
+     }
 }
 EOF
         # Configuration de la rotation des logs
@@ -187,6 +205,59 @@ EOF
         restorecon -R /var/log/processmaker
         systemctl restart nginx php-fpm || { log_and_display "Erreur lors du redémarrage de Nginx ou PHP-FPM." ; exit 1; }
         log_and_display "Installation et configuration terminées !"
+                # display_credentials
+        log_and_display "<==========================> Détail de l'installation de ProcessMaker <=================================>"
+        log_and_display "ProcessMaker Version: ${NEW_VERSION}"
+        log_and_display "Répertoire d'installation de ProcessMaker: ${REP_PM}"
+        log_and_display "Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables."
+        log_and_display ""
+        log_and_display "Les comptes utilisateurs par défaut sont :"
+        log_and_display "UTILISATEUR  -  MOT DE PASSE       -  ACCES"
+        log_and_display "pm           -  ${ADMINPMPWD}       -  compte admin"
+        log_and_display ""
+        log_and_display "Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :"
+        log_and_display "http://${IPADRESS}" 
+        log_and_display ""
+        log_and_display "==> Database:"
+        log_and_display "Mot de passe root: ${SLQROOTPWD}"
+        log_and_display "Mot de passe glpi_user: ${SQLPMPWD}"
+        log_and_display "Nom de la base de données ProcessMaker: processmaker"
+        log_and_display "<===============================================================================================>"
+        log_and_display ""
+        log_and_display "Si vous rencontrez un problème avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues"
+        
+        # write_credentials
+        cat > /root/sauve_mdp.txt << EOF
+ <==========================> Détail de l'installation de ProcessMaker <=================================
+ ProcessMaker Version: ${NEW_VERSION}
+ Répertoire d'installation de ProcessMaker: ${REP_PM}
+ Il est important d'enregistrer ces informations. Si vous les perdez, elles seront irrécupérables.
+ 
+ Les comptes utilisateurs par défaut sont :
+ UTILISATEUR       -  MOT DE PASSE       -  ACCES
+ pm          -  ${ADMINPMPWD}       -  compte admin
+ 
+ Vous pouvez accéder à la page web de ProcessMaker à partir d'une adresse IP ou d'un nom d'hôte :
+ http://${IPADRESS}
+ 
+ ==> Database:
+ Mot de passe root: ${SLQROOTPWD}
+ Mot de passe glpi_user: ${SQLPMPWD}
+ Nom de la base de données ProcessMaker: processmaker
+ <===============================================================================================>
+ 
+ Si vous rencontrez un probléme avec ce script, veuillez le signaler sur GitHub : https://github.com/PapyPoc/glpi_install/issues
+EOF
+        chmod 700 /root/sauve_mdp.txt
+        log_and_display ""
+        log_and_display "Fichier de sauve_mdp.txt enregistrer dans /home"
+        log_and_display ""
+        # Vérifie si le répertoire existe
+        #if [ -e "$REP_SCRIPT" ]; then
+        #        log_and_display "Le script est déjà présent."
+        #        log_and_display "Effacement en cours"
+        #        rm -Rf "$REP_SCRIPT"
+        #fi
     fi
 fi
 # Restaurer les flux de sortie à leur état initial
