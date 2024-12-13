@@ -18,7 +18,7 @@ Process Maker is installed by running the following command in your terminal.
 >⚠️ Git must be installed on your system.
 >
 >```bash
->dnf install -yq git
+>dnf install -y -q git
 >```
 
 ```bash
