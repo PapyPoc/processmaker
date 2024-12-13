@@ -86,7 +86,7 @@ EOF
 
         # Installation des extensions PHP
         log_and_display "Installation des services LEMP..."
-        dnf install -yq nginx nodejs redis php mysql-server wget phpmyadmin || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
+        dnf install -yq nginx zip nodejs redis php mysql-server wget || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
         dnf install -yq crontabs logrotate cronie tar perl curl jq || { log_and_display "Erreur lors de l'installation des services LAMP." ; exit 1; }
         sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
         sed -i 's/^\(;\?\)\(group =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
@@ -130,7 +130,9 @@ EOF
         log_and_display "Téléchargement et installation de ProcessMaker..."
         wget -O /tmp/pm-latest.zip "$DOWNLOADLINK" || { log_and_display "Erreur lors du téléchargement de ProcessMaker." ; exit 1; }
         mkdir -p "${REP_PM}"
-        tar --strip-components=1 -xzf /tmp/pm-latest.zip -C "${REP_PM}" || { log_and_display "Erreur lors de l'extraction de ProcessMaker." ; exit 1; }
+        unzip /tmp/pm-latest.zip -d ${REP_PM} || { log_and_display "Erreur lors de l'extraction de ProcessMaker." ; exit 1; }
+        mv ${REP_PM}/*/* ${REP_PM}
+        rm -Rf ${REP_PM}/tomolimo*
         # Configuration de ProcessMaker et des logs
         log_and_display "Configuration de ProcessMaker..."
         mkdir -p /var/log/processmaker
