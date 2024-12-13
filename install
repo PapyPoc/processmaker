@@ -55,16 +55,16 @@ if [[ "${ID}" =~ ^(almalinux|centos|rocky|rhel)$ ]]; then
     else
         log_and_display "Nouvelle installation : ProcessMaker version $NEW_VERSION"
         log_and_display "Recherche des mises à jour du sytème..."
-        dnf update -yq || { log_and_display "Erreur lors de la mise à jour." ; exit 1; }
+        dnf update -y -q || { log_and_display "Erreur lors de la mise à jour." ; exit 1; }
         log_and_display "Application des mises à jour.."
-        dnf upgrade -yq || { log_and_display "Erreur lors de l'upgrade." ; exit 1; }
+        dnf upgrade -y -q || { log_and_display "Erreur lors de l'upgrade." ; exit 1; }
         sleep 1
-        dnf install -yq https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || { log_and_display "Erreur lors de l'installation d'epel-release." ; exit 1; }        
-        dnf install -yq https://rpms.remirepo.net/enterprise/remi-release-9.rpm
-        dnf module reset -yq php nginx nodejs redis || { log_and_display "Erreur lors de la réinitialisation des modules." ; exit 1; }
-        dnf module switch-to -y nginx:1.24 nodejs:22 php:remi-7.4 redis:7 || { log_and_display "Erreur lors de la mise à jour des modules." ; exit 1; }
+        dnf install -y -q https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || { log_and_display "Erreur lors de l'installation d'epel-release." ; exit 1; }        
+        dnf install -y -q https://rpms.remirepo.net/enterprise/remi-release-9.rpm
+        dnf module reset -y -q php nginx nodejs redis || { log_and_display "Erreur lors de la réinitialisation des modules." ; exit 1; }
+        dnf module switch-to -y -q nginx:1.24 nodejs:22 php:remi-7.4 redis:7 || { log_and_display "Erreur lors de la mise à jour des modules." ; exit 1; }
         log_and_display "Activation des mises à jour automatiques"
-        dnf install dnf-automatic -yq || { log_and_display "Erreur lors de l'installation de dnf-automatic." ; exit 1; }
+        dnf install dnf-automatic -y -q || { log_and_display "Erreur lors de l'installation de dnf-automatic." ; exit 1; }
         # Configuration des mises à jour automatiques
         sed -i 's/^\(;\?\)\(apply_updates =\).*/\2 yes/' /etc/dnf/automatic.conf
         sed -i 's/^\(;\?\)\(reboot =\).*/\2 when-needed/' /etc/dnf/automatic.conf
@@ -86,12 +86,12 @@ EOF
 
         # Installation des extensions PHP
         log_and_display "Installation des services LEMP..."
-        dnf install -yq nginx zip nodejs redis php mysql-server wget || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
-        dnf install -yq crontabs logrotate cronie tar perl curl jq || { log_and_display "Erreur lors de l'installation des services LAMP." ; exit 1; }
+        dnf install -y -q nginx zip nodejs redis php mysql-server wget || { log_and_display "Erreur lors de l'installation des paquets nécessaires." ; exit 1; }
+        dnf install -y -q crontabs logrotate cronie tar perl curl jq || { log_and_display "Erreur lors de l'installation des services LAMP." ; exit 1; }
         sed -i 's/^\(;\?\)\(user =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
         sed -i 's/^\(;\?\)\(group =\).*/\2 nginx/' /etc/php-fpm.d/www.conf
         log_and_display "Installation des extensions PHP"
-        dnf install -yq php-gd php-xml php-soap php-mbstring php-ldap php-cli php-curl || { log_and_display "Erreur lors de l'installation des extensions PHP." ; exit 1; }
+        dnf install -y -q php-gd php-xml php-soap php-mbstring php-ldap php-cli php-curl || { log_and_display "Erreur lors de l'installation des extensions PHP." ; exit 1; }
         # Activation et démarrage des services nécessaires
         log_and_display "Activation et démarrage de MySQL, Nginx et PHP-FPM"
         systemctl enable --now nginx mysqld php-fpm || { log_and_display "Erreur lors de l'activation des services." ; exit 1; }
@@ -125,9 +125,9 @@ EOF
         mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p"$SQLROOTPWD" mysql
         # Téléchargement et installation de ProcessMaker
         log_and_display "Téléchargement et installation de ProcessMaker..."
-        wget -O /tmp/pm-latest.zip "$DOWNLOADLINK" || { log_and_display "Erreur lors du téléchargement de ProcessMaker." ; exit 1; }
+        wget -q -O /tmp/pm-latest.zip "$DOWNLOADLINK" || { log_and_display "Erreur lors du téléchargement de ProcessMaker." ; exit 1; }
         mkdir -p "${REP_PM}"
-        unzip /tmp/pm-latest.zip -d ${REP_PM} || { log_and_display "Erreur lors de l'extraction de ProcessMaker." ; exit 1; }
+        unzip -qq /tmp/pm-latest.zip -d ${REP_PM} || { log_and_display "Erreur lors de l'extraction de ProcessMaker." ; exit 1; }
         mv ${REP_PM}/*/* ${REP_PM}
         rm -Rf ${REP_PM}/tomolimo*
         # Configuration de ProcessMaker et des logs
